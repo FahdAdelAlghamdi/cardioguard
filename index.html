@@ -1,0 +1,1428 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CardioGuard</title>
+<meta name="description" content="CardioGuard: early warning and home follow-up for heart-failure patients">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-basic-dist-min@2.35.2/plotly-basic.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<style>
+:root{
+  --bg:#F4F6FA; --card:#FFFFFF; --ink:#0F1E33; --ink2:#4A5A70; --ink3:#8593A6; --line:#E3E8F0;
+  --brand:#0B3C5D; --brand2:#1F5F8B; --heart:#E5484D;
+  --ok:#22A06B; --med:#E9A800; --measure:#2F80ED; --warn:#F07F23; --crit:#E5484D; --emerg:#B4232A; --sugar:#7B4FD0;
+  --okbg:#E6F6EE; --medbg:#FFF6D6; --measurebg:#E7F0FD; --warnbg:#FFEFE1; --critbg:#FDE8E9; --sugarbg:#F1E9FB;
+  --r:18px; --shadow:0 1px 2px rgba(15,30,51,.06),0 4px 16px rgba(15,30,51,.06);
+  --font:'IBM Plex Sans Arabic','IBM Plex Sans',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer}
+.wrap{max-width:1280px;margin:0 auto;padding:0 16px}
+
+/* header + demo bar */
+header{background:var(--brand);color:#fff}
+.hd{display:flex;align-items:center;gap:14px;padding:14px 0;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:20px}
+.logo svg{width:34px;height:34px}
+.tag{color:#B9CFE2;font-size:13px;font-weight:500}
+.spacer{flex:1}
+.lang{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:999px;padding:7px 14px;font-weight:600;font-size:13px}
+nav.tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+nav.tabs button{background:none;border:0;color:#B9CFE2;padding:12px 16px;font-size:15px;font-weight:600;border-bottom:3px solid transparent;white-space:nowrap}
+nav.tabs button.on{color:#fff;border-bottom-color:#fff}
+.demo{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--line);box-shadow:0 2px 10px rgba(15,30,51,.05)}
+.db{display:flex;align-items:center;gap:12px;padding:10px 0;flex-wrap:wrap}
+.dayinfo{min-width:160px}
+.dayinfo b{font-size:15px}
+.dayinfo small{display:block;color:var(--ink3);font-size:12px}
+.ctrl{display:flex;align-items:center;gap:6px;flex:1;min-width:200px}
+.ctrl input[type=range]{flex:1;accent-color:var(--brand)}
+.ib{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink);font-size:14px;display:grid;place-items:center;flex:none}
+.ib.play{background:var(--brand);color:#fff;border-color:var(--brand)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 11px;font-size:13px;font-weight:600;color:var(--ink2)}
+.chip:hover{border-color:var(--brand2);color:var(--brand)}
+.chip i{font-style:normal;margin-inline-end:4px}
+.sim{font-size:11.5px;color:var(--ink3);padding:0 0 8px}
+main{padding:20px 0 48px}
+.view{display:none}
+.view.on{display:block}
+
+/* shared layout */
+.pw,.fam{display:grid;grid-template-columns:400px 1fr;gap:24px;align-items:start}
+.side{display:grid;gap:20px}
+.panel{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:20px}
+.panel h3{margin:0 0 12px;font-size:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.muted{color:var(--ink3)}
+.meter{height:10px;border-radius:99px;background:#EEF1F6;overflow:hidden;position:relative}
+.meter i{display:block;height:100%;border-radius:99px;transition:width .3s}
+.stag{display:inline-block;border-radius:8px;padding:1px 7px;font-size:11.5px;font-weight:700;margin-inline-end:4px;background:#EEF1F6;color:var(--ink2)}
+.stag.clinical{background:var(--warnbg);color:#A04A00}
+.stag.glucose{background:var(--sugarbg);color:#6B3FB8}
+.stag.adherence{background:var(--measurebg);color:var(--brand)}
+@keyframes flash{from{opacity:1}to{opacity:.3}}
+
+/* phone */
+.phone{width:100%;max-width:400px;margin:0 auto;background:#0F1E33;border-radius:44px;padding:12px;box-shadow:0 20px 50px rgba(15,30,51,.25)}
+.screen{background:var(--bg);border-radius:34px;overflow:hidden;height:780px;overflow-y:auto;scrollbar-width:thin;position:relative}
+.sbar{display:flex;justify-content:space-between;padding:12px 24px 4px;font-size:13px;font-weight:600}
+.app{padding:8px 16px 24px;display:grid;gap:14px}
+.hello{font-size:22px;font-weight:700;margin:6px 0 0}
+.hello small{display:block;font-size:14px;color:var(--ink3);font-weight:500}
+.status{border-radius:22px;padding:18px;color:#fff;display:grid;gap:10px}
+.status .t{font-size:20px;font-weight:700;display:flex;align-items:center;gap:10px}
+.status .m{font-size:16px;line-height:1.6}
+.status .row{display:flex;gap:8px;flex-wrap:wrap}
+.status.flash{animation:flash .6s ease-in-out 6 alternate}
+.sbtn{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.45);color:#fff;border-radius:14px;padding:10px 14px;font-size:15px;font-weight:600;text-decoration:none}
+.lv0{background:var(--ok)} .lv1,.lv2{background:var(--warn)} .lv3{background:var(--crit)} .lv4{background:var(--emerg)} .lvg{background:var(--sugar)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{background:#fff;border-radius:16px;padding:12px 14px;border:1px solid var(--line)}
+.tile .k{font-size:13px;color:var(--ink2);display:flex;align-items:center;gap:6px}
+.tile .k em{font-style:normal;margin-inline-start:auto;font-size:10.5px;color:var(--ink3);background:#F0F3F8;border-radius:6px;padding:1px 6px;white-space:nowrap}
+.tile .v{font-size:24px;font-weight:700;margin-top:2px}
+.tile .v small{font-size:13px;font-weight:500;color:var(--ink3)}
+.tile .d{font-size:12px;color:var(--ink3)}
+.tile.bad{border-color:var(--warn);background:var(--warnbg)}
+.tile.bad .d{color:#A04A00;font-weight:600}
+.sect{background:#fff;border-radius:18px;padding:14px;border:1px solid var(--line)}
+.sect h4{margin:0 0 10px;font-size:16px;display:flex;align-items:center;gap:8px}
+.med{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.med:first-of-type{border-top:0}
+.med .n{flex:1;font-size:15px;font-weight:600}
+.med .n small{display:block;font-weight:500;color:var(--ink3);font-size:12.5px}
+.take{border:0;border-radius:12px;padding:10px 14px;font-weight:700;font-size:14px;background:var(--med);color:#3A2A00}
+.taken{border-radius:12px;padding:8px 12px;font-weight:700;font-size:13px;background:var(--okbg);color:var(--ok);white-space:nowrap}
+.meal{display:grid;grid-template-columns:72px 1fr;gap:8px;padding:6px 0;font-size:14.5px}
+.meal b{color:var(--ink2);font-weight:600}
+.limits{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.limits span{background:var(--measurebg);color:var(--brand);border-radius:10px;padding:6px 10px;font-size:13px;font-weight:600}
+.linkbtn{background:none;border:0;color:var(--brand2);font-weight:600;font-size:14px;padding:6px 0}
+.no{display:grid;gap:6px;margin-top:8px}
+.no div{display:flex;justify-content:space-between;gap:8px;font-size:14px;padding:6px 10px;background:var(--critbg);border-radius:10px}
+.no div span:last-child{color:var(--ok);font-weight:600}
+.call{border:0;border-radius:14px;padding:13px;font-weight:700;font-size:15px;color:#fff;background:var(--brand);text-align:center;text-decoration:none;display:block}
+.call.alt{background:#fff;color:var(--brand);border:1px solid var(--line)}
+
+/* voice assistant */
+.voice{display:grid;gap:8px}
+.bub{padding:10px 13px;border-radius:14px;font-size:14.5px;line-height:1.6;max-width:90%}
+.bub.sys{background:#E7F0FD;color:#0B3C5D;justify-self:start}
+.bub.me{background:#0B3C5D;color:#fff;justify-self:end}
+.vrow{display:flex;gap:6px;flex-wrap:wrap}
+.vrow button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 13px;font-size:13.5px;font-weight:600}
+.vrow .mic{background:var(--heart);color:#fff;border-color:var(--heart)}
+.vrow .mic.on{animation:flash .7s infinite alternate}
+.vtrig{display:flex;gap:6px;flex-wrap:wrap}
+.vt{border:1px solid var(--line);background:#fff;border-radius:12px;padding:7px 11px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
+.dot{width:12px;height:12px;border-radius:50%;flex:none;display:inline-block}
+.toggle{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600}
+.toggle input{width:20px;height:20px;accent-color:var(--brand)}
+.legend{display:grid;gap:8px}
+.legend div{display:grid;grid-template-columns:16px 1fr auto;gap:10px;align-items:center;font-size:14px}
+.legend em{font-style:normal;color:var(--ink3);font-size:12.5px;font-family:monospace;direction:ltr}
+.flashbar{height:8px;border-radius:99px;background:#EEF1F6;transition:background .3s}
+.flashbar.on{animation:flash .5s infinite alternate}
+
+/* engine panel */
+.eng{display:grid;gap:10px}
+.sig{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.sig div{border:1px solid var(--line);border-radius:12px;padding:10px 4px;text-align:center;font-size:12.5px;color:var(--ink2)}
+.sig div b{display:block;font-size:18px;margin-bottom:2px}
+.sig div.on{background:var(--warnbg);border-color:#F9C79A;color:#A04A00}
+.ladder{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.ladder div{border-radius:12px;padding:10px 6px;font-size:12.5px;font-weight:600;background:#F0F3F8;color:var(--ink3);text-align:center;line-height:1.4}
+.ladder div.on{color:#fff}
+.reasons{margin:0;padding-inline-start:18px;display:grid;gap:4px;font-size:14px;line-height:1.55}
+.note{font-size:13.5px;background:#F0F3F8;border-radius:10px;padding:8px 10px;line-height:1.55}
+.note.good{background:var(--okbg);color:#0E6B45;font-weight:600}
+.note.warn{background:var(--warnbg);color:#A04A00;font-weight:600}
+
+/* band */
+.bandg{display:grid;grid-template-columns:1.1fr 1fr;gap:24px;align-items:start}
+.stage{position:relative;background:radial-gradient(circle at 50% 30%,#1B4A6E,#0A1C2E 72%);border-radius:var(--r);height:600px;overflow:hidden;box-shadow:var(--shadow);touch-action:none}
+.stage canvas{display:block;width:100%;height:100%;cursor:grab}
+.stage .hud{position:absolute;inset-inline:16px;top:14px;display:flex;justify-content:space-between;gap:10px;color:#CFE0F0;font-size:13px;pointer-events:none}
+.stage .ctl{position:absolute;inset-inline:16px;bottom:14px;background:rgba(7,20,34,.78);border-radius:14px;padding:12px 14px;color:#fff;display:grid;gap:6px}
+.stage .ctl label{display:flex;justify-content:space-between;font-size:13.5px;font-weight:600}
+.stage .ctl input{width:100%;accent-color:#F07F23}
+.stage .ctl small{color:#B4C8DB;font-size:12.5px;line-height:1.55}
+.stage .fallback{position:absolute;inset:0;display:grid;place-items:center;color:#CFE0F0;font-size:14px;padding:30px;text-align:center}
+.sensors{display:grid;gap:10px}
+.sensor{display:grid;grid-template-columns:36px 1fr;gap:12px;align-items:start;background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px}
+.sensor b{display:block;font-size:14.5px;margin-bottom:2px}
+.sensor span{font-size:13.5px;color:var(--ink2);line-height:1.6}
+.sensor .ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:18px;background:var(--measurebg)}
+.live{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.live div{background:#F7F9FC;border-radius:12px;padding:10px}
+.live div.bad{background:var(--warnbg)}
+.live small{display:block;color:var(--ink3);font-size:12px}
+.live b{font-size:18px}
+.live b small{display:inline;font-size:12px}
+
+/* family + automatic call */
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.week div{text-align:center;font-size:11.5px;color:var(--ink3)}
+.week div i{display:block;height:28px;border-radius:8px;margin-bottom:4px}
+.feed{display:grid;gap:10px}
+.fi{display:grid;grid-template-columns:10px 1fr;gap:10px;padding:10px 12px;background:#fff;border:1px solid var(--line);border-radius:14px;font-size:14px;line-height:1.55}
+.fi .bar{border-radius:99px}
+.fi small{color:var(--ink3);display:block;margin-bottom:2px}
+.callrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.chain{display:grid}
+.cstep{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:center;padding:10px 0;position:relative}
+.cstep .n{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;background:#EEF1F6;color:var(--ink2);z-index:1}
+.cstep.ok .n{background:var(--ok);color:#fff}
+.cstep.miss .n{background:#B8C3D1;color:#fff}
+.cstep.wait .n{background:#fff;border:2px dashed #C9D2DE}
+.cstep:not(:last-child)::after{content:"";position:absolute;inset-inline-start:14px;top:40px;bottom:-10px;width:2px;background:var(--line)}
+.cstep b{font-size:14.5px}
+.cstep small{color:var(--ink3);font-size:12.5px;display:block}
+.pill{border-radius:999px;padding:4px 10px;font-size:12px;font-weight:700;white-space:nowrap}
+.pill.ok{background:var(--okbg);color:var(--ok)}
+.pill.miss{background:#EEF1F6;color:var(--ink2)}
+.trigger{background:var(--critbg);border-radius:14px;padding:12px 14px;font-size:14px;line-height:1.65;margin-bottom:10px}
+.incoming{position:absolute;inset:0;z-index:5;background:linear-gradient(180deg,#0B3C5D,#06182A);color:#fff;display:none;flex-direction:column;align-items:center;justify-content:space-between;padding:60px 22px 46px;text-align:center}
+.incoming.on{display:flex}
+.incoming .who{font-size:25px;font-weight:700;margin-top:16px}
+.incoming .sub{color:#B9CFE2;font-size:15px;margin-top:6px}
+.incoming .msg{font-size:15px;line-height:1.8;background:rgba(255,255,255,.08);border-radius:16px;padding:14px}
+.incoming .keys{display:flex;gap:28px;align-items:center}
+.incoming .k{width:74px;height:74px;border-radius:50%;border:0;font-size:24px;font-weight:700;color:#fff}
+.incoming .done{font-size:18px;font-weight:700;color:#7EE2B0}
+.ringa{width:96px;height:96px;border-radius:50%;background:#E5484D;display:grid;place-items:center;font-size:40px;margin:0 auto;animation:pulse 1.2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(229,72,77,.6)}100%{box-shadow:0 0 0 26px rgba(229,72,77,0)}}
+
+/* doctor */
+.rep{display:grid;gap:18px}
+.rhead{display:grid;grid-template-columns:1.4fr 1fr;gap:18px}
+.pinfo{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 18px;font-size:14px}
+.pinfo div small{display:block;color:var(--ink3);font-size:12px}
+.pinfo div b{font-weight:600}
+.ai{border-radius:var(--r);padding:18px;background:linear-gradient(135deg,#0B3C5D,#1F5F8B);color:#fff;display:grid;gap:10px}
+.ai .lbl{font-size:12px;color:#B9CFE2;font-weight:600}
+.ai p{margin:0;font-size:16px;line-height:1.7}
+.ai .disc{font-size:12px;color:#B9CFE2}
+.sbarg{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.sbarg div{background:#F7F9FC;border-radius:14px;padding:12px;font-size:14px;line-height:1.65}
+.sbarg b{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--brand2);margin-bottom:4px}
+.sbarg b i{font-style:normal;width:24px;height:24px;border-radius:8px;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:13px}
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+.kpi{background:#fff;border-radius:16px;padding:14px;box-shadow:var(--shadow)}
+.kpi small{color:var(--ink3);font-size:12.5px;display:block;min-height:32px}
+.kpi b{font-size:26px;font-weight:700}
+.kpi b small{display:inline;font-size:13px;min-height:0}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.chart{background:#fff;border-radius:var(--r);box-shadow:var(--shadow);padding:14px 14px 4px}
+.chart h4{margin:0 0 2px;font-size:15px}
+.chart p{margin:0;font-size:12.5px;color:var(--ink3)}
+.chart .plot{height:250px}
+.chart.wide{grid-column:1/-1}
+.gap{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.gap div{background:#F7F9FC;border-radius:14px;padding:12px}
+.gap small{color:var(--ink3);font-size:12.5px;display:block}
+.gap b{font-size:20px}
+table.log{width:100%;border-collapse:collapse;font-size:13.5px}
+table.log th{text-align:start;color:var(--ink3);font-weight:600;padding:8px;border-bottom:1px solid var(--line);font-size:12.5px}
+table.log td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.55}
+.lvtag{display:inline-block;border-radius:8px;padding:2px 8px;font-size:12px;font-weight:700;color:#fff;white-space:nowrap}
+.rtools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.seg{display:flex;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.seg button{border:0;background:#fff;padding:8px 14px;font-weight:600;font-size:13.5px;color:var(--ink2)}
+.seg button.on{background:var(--brand);color:#fff}
+.btn{border:0;border-radius:12px;padding:9px 16px;font-weight:700;font-size:14px;background:var(--brand);color:#fff}
+
+/* how */
+.how{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.step{background:#fff;border-radius:var(--r);box-shadow:var(--shadow);padding:18px}
+.step b{display:block;font-size:28px;color:var(--brand2)}
+.step h4{margin:6px 0;font-size:16px}
+.step p{margin:0;color:var(--ink2);font-size:14px;line-height:1.7}
+h2.sec{margin:28px 0 14px;font-size:20px}
+
+.modal{position:fixed;inset:0;background:rgba(15,30,51,.5);display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal.on{display:flex}
+.mbox{background:#fff;border-radius:22px;max-width:760px;width:100%;max-height:86vh;overflow:auto;padding:20px}
+.mbox table{width:100%;border-collapse:collapse;font-size:14px}
+.mbox td,.mbox th{padding:8px;border-bottom:1px solid var(--line);text-align:start;vertical-align:top}
+.mbox th{color:var(--ink3);font-size:12.5px}
+.qr{display:grid;place-items:center;margin:12px 0}
+.qr svg{width:220px;height:220px}
+footer{color:var(--ink3);font-size:12.5px;text-align:center;padding:24px 16px}
+
+@media (max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.how{grid-template-columns:1fr 1fr}}
+@media (max-width:900px){
+  .pw,.fam,.rhead,.charts,.bandg{grid-template-columns:1fr}
+  .gap,.sbarg,.pinfo{grid-template-columns:1fr 1fr}
+  .phone{border-radius:0;padding:0;box-shadow:none;background:none;max-width:none}
+  .screen{border-radius:0;height:auto;min-height:640px;overflow:visible;background:none}
+  .sbar{display:none}
+  .app{padding:0}
+  .stage{height:460px}
+}
+@media (max-width:560px){.kpis{grid-template-columns:1fr 1fr}.how{grid-template-columns:1fr}.sig{grid-template-columns:repeat(3,1fr)}.ladder{grid-template-columns:1fr 1fr}.live{grid-template-columns:1fr 1fr}}
+@media print{
+  header,.demo,nav,footer,.rtools,.noprint{display:none!important}
+  body{background:#fff}
+  .view{display:none!important} #v-doctor{display:block!important}
+  .chart,.kpi,.panel{box-shadow:none;border:1px solid var(--line);break-inside:avoid}
+}
+
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="hd">
+      <div class="logo">
+        <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 34s-13-8.2-13-17.2C7 11.6 10.8 8 15.2 8c2.4 0 3.9 1.2 4.8 2.5C20.9 9.2 22.4 8 24.8 8 29.2 8 33 11.6 33 16.8 33 25.8 20 34 20 34z" fill="#E5484D"/><path d="M8.5 20h7l2.2-4.6 3.6 9 2.4-4.4h7.8" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>CardioGuard</span>
+      </div>
+      <span class="tag" data-t="tagline"></span>
+      <span class="spacer"></span>
+      <button class="lang" id="langBtn">English</button>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button data-v="patient" class="on" data-t="tab_patient"></button>
+      <button data-v="band" data-t="tab_band"></button>
+      <button data-v="family" data-t="tab_family"></button>
+      <button data-v="doctor" data-t="tab_doctor"></button>
+      <button data-v="how" data-t="tab_how"></button>
+    </nav>
+  </div>
+</header>
+
+<div class="demo">
+  <div class="wrap">
+    <div class="db">
+      <div class="dayinfo"><b id="dayLbl"></b><small id="dateLbl"></small></div>
+      <div class="ctrl">
+        <button class="ib" id="prev" aria-label="previous day">‹</button>
+        <input type="range" id="slider" min="0" max="89" value="20" aria-label="day">
+        <button class="ib" id="next" aria-label="next day">›</button>
+        <button class="ib play" id="play" aria-label="play">▶</button>
+      </div>
+      <div class="chips">
+        <button class="chip" data-sc="normal"><i>🟢</i><span data-t="sc_normal"></span></button>
+        <button class="chip" data-sc="false"><i>⚖️</i><span data-t="sc_false"></span></button>
+        <button class="chip" data-sc="wedding"><i>🎉</i><span data-t="sc_wedding"></span></button>
+        <button class="chip" data-sc="sugar"><i>🩸</i><span data-t="sc_sugar"></span></button>
+        <button class="chip" data-sc="episode"><i>🫀</i><span data-t="sc_episode"></span></button>
+        <button class="chip" data-sc="after"><i>✅</i><span data-t="sc_after"></span></button>
+      </div>
+    </div>
+    <div class="sim" data-t="sim_note"></div>
+  </div>
+</div>
+
+<main class="wrap">
+  <section class="view on" id="v-patient">
+    <div class="pw">
+      <div class="phone"><div class="screen">
+        <div class="sbar"><span>08:30</span><span>●●● 5G</span></div>
+        <div class="app" id="patientApp"></div>
+      </div></div>
+      <div class="side">
+        <div class="panel">
+          <h3>🗣️ <span data-t="voice_title"></span></h3>
+          <p class="muted" style="margin:-4px 0 12px;font-size:13.5px;line-height:1.6" data-t="voice_sub"></p>
+          <div class="vtrig" id="vtrig"></div>
+          <div class="flashbar" id="flashbar" style="margin:12px 0"></div>
+          <div class="voice" id="voice"></div>
+          <label class="toggle" style="margin-top:12px"><input type="checkbox" id="hearing"><span data-t="hearing_mode"></span></label>
+        </div>
+        <div class="panel"><h3 data-t="legend_title"></h3><div class="legend" id="legend"></div></div>
+        <div class="panel eng" id="engine"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="v-band">
+    <div class="bandg">
+      <div>
+        <div class="stage" id="stage">
+          <div class="hud"><span data-t="drag_hint"></span><span id="hudState"></span></div>
+          <div class="ctl">
+            <label><span data-t="swell_sim"></span><span id="swellVal">+0 mm</span></label>
+            <input type="range" id="swell" min="0" max="14" step="0.5" value="0" aria-label="swelling">
+            <small id="swellNote"></small>
+          </div>
+        </div>
+      </div>
+      <div class="side">
+        <div class="panel">
+          <h3>🦶 <span data-t="band_title"></span></h3>
+          <p class="muted" style="margin:0 0 14px;font-size:14px;line-height:1.7" data-t="band_sub"></p>
+          <div class="live" id="bandLive"></div>
+        </div>
+        <div class="panel"><h3 data-t="band_sensors"></h3><div class="sensors" id="sensors"></div></div>
+        <div class="panel"><h3>🛡️ <span data-t="band_safety_t"></span></h3><p class="muted" style="margin:0;font-size:14px;line-height:1.75" data-t="band_safety"></p>
+          <p class="muted" style="margin:12px 0 0;font-size:12.5px;line-height:1.7" data-t="band_research"></p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="v-family">
+    <div class="fam">
+      <div class="phone"><div class="screen">
+        <div class="sbar"><span>09:10</span><span>●●● 5G</span></div>
+        <div class="app" id="familyApp"></div>
+        <div class="incoming" id="incoming"></div>
+      </div></div>
+      <div class="side">
+        <div class="panel"><h3>📞 <span data-t="call_title"></span></h3><div id="callBox"></div></div>
+        <div class="panel"><h3 data-t="esc_title"></h3><div class="ladder" id="famLadder"></div>
+          <p class="muted" style="margin:12px 0 0;font-size:14px;line-height:1.75" data-t="fam_why_t"></p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="v-doctor">
+    <div class="rep">
+      <div class="rtools noprint">
+        <h2 style="margin:0;font-size:22px;flex:1" data-t="doc_title"></h2>
+        <div class="seg" id="period"><button data-p="30" class="on" data-t="p30"></button><button data-p="90" data-t="p90"></button></div>
+        <button class="btn" id="printBtn" data-t="print"></button>
+      </div>
+      <div class="rhead">
+        <div class="panel"><div class="pinfo" id="pinfo"></div></div>
+        <div class="ai"><div class="lbl">✦ <span data-t="ai_summary"></span></div><p id="aiText"></p><div class="disc" data-t="ai_disc"></div></div>
+      </div>
+      <div class="panel"><h3 data-t="sbar"></h3><div class="sbarg" id="sbarBox"></div></div>
+      <div class="kpis" id="kpis"></div>
+      <div class="charts">
+        <div class="chart wide"><h4 data-t="ch_weight"></h4><p data-t="ch_weight_s"></p><div class="plot" id="chW"></div></div>
+        <div class="chart wide"><h4 data-t="ch_ankle"></h4><p data-t="ch_ankle_s"></p><div class="plot" id="chK"></div></div>
+        <div class="chart"><h4 data-t="ch_ox"></h4><p data-t="ch_ox_s"></p><div class="plot" id="chB"></div></div>
+        <div class="chart"><h4 data-t="ch_act"></h4><p data-t="ch_act_s"></p><div class="plot" id="chA"></div></div>
+        <div class="chart"><h4 data-t="ch_glu"></h4><p data-t="ch_glu_s"></p><div class="plot" id="chG"></div></div>
+        <div class="chart"><h4 data-t="ch_bp"></h4><p data-t="ch_bp_s"></p><div class="plot" id="chP"></div></div>
+        <div class="chart wide"><h4 data-t="ch_adh"></h4><p data-t="ch_adh_s"></p><div class="plot" id="chD" style="height:170px"></div></div>
+      </div>
+      <div class="panel"><h3 data-t="gap_title"></h3><div id="gapBox"></div></div>
+      <div class="panel"><h3 data-t="log_title"></h3><div style="overflow-x:auto"><table class="log" id="logTbl"></table></div></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-how">
+    <div class="how" id="howBox"></div>
+    <h2 class="sec" data-t="pay_title"></h2>
+    <div class="how" id="payBox"></div>
+    <h2 class="sec" data-t="safe_title"></h2>
+    <div class="how" id="safeBox"></div>
+  </section>
+</main>
+
+<div class="modal" id="dietModal"><div class="mbox"><div style="display:flex;align-items:center;margin-bottom:10px"><h3 style="margin:0;flex:1" data-t="week_plan"></h3><button class="ib" id="closeDiet">✕</button></div><div id="dietTbl"></div><p class="muted" style="font-size:12.5px" data-t="diet_disc"></p></div></div>
+<div class="modal" id="shareModal"><div class="mbox" style="max-width:420px;text-align:center"><div style="display:flex;align-items:center;margin-bottom:6px"><h3 style="margin:0;flex:1" data-t="share_title"></h3><button class="ib" id="closeShare">✕</button></div><p class="muted" style="font-size:14px;line-height:1.7" data-t="share_text"></p><div id="qr" class="qr"></div><button class="btn" id="openReport" data-t="open_report"></button></div></div>
+
+<footer><span data-t="footer"></span></footer>
+
+<script>
+const DATA = {"patient":{"id":"P-0001","age":68,"dry_weight":78.0,"conditions":["heart_failure","hypertension","type2_diabetes"]},"meds":[{"id":"furosemide","time":"08:00"},{"id":"bisoprolol","time":"08:00"},{"id":"sacubitril_valsartan","time":"08:00"},{"id":"empagliflozin","time":"08:00"},{"id":"sacubitril_valsartan","time":"20:00"}],"contacts":[{"name":"khalid","relation":"son","phone":"+966500000001"},{"name":"sara","relation":"daughter","phone":"+966500000002"},{"name":"nurse","relation":"home_nurse","phone":"+966500000003"}],"baseline":{"weight":{"median":78.0,"spread":0.25},"ankle":{"median":231.7,"spread":0.8},"bia":{"median":-0.15,"spread":0.74},"spo2":{"median":95.3,"spread":1.04},"hr":{"median":69.0,"spread":2.0},"steps":{"median":3485.0,"spread":300},"glucose":{"median":143.0,"spread":11.86}},"thresholds":{"weight_gain":0.8,"weight_jump":2.5,"cusum_k":0.3,"cusum_h":1.2,"ankle_gain":4.0,"bia_drop":3.0,"ankle_evening":10.0,"band_tight":11.0,"spo2_drop":2.5,"spo2_floor":92.0,"hr_rise":8.0,"activity_drop":0.7,"sbp_low":90.0,"spo2_emergency":88.0,"glucose_low":70.0,"glucose_very_low":54.0,"anomaly_high":70.0},"episodes":[{"start":68,"end":75,"max_level":3,"missed_diuretic":3,"salty_days":1,"first_alert":68,"family_call":70,"symptoms_day":71,"peak_weight_gain":2.9,"peak_ankle_gain":8.1}],"days":[{"day":0,"date":"2026-07-01","weight":78.0,"ankle_am":231.3,"ankle_pm":235.5,"bia":-0.7,"upright_h":7.2,"steps":3500,"spo2":95.4,"rest_hr":71,"sbp":126,"dbp":76,"glu_mean":156,"glu_night_min":99,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":4,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":1,"date":"2026-07-02","weight":78.1,"ankle_am":230.5,"ankle_pm":233.0,"bia":-1.3,"upright_h":5.9,"steps":3430,"spo2":95.2,"rest_hr":65,"sbp":129,"dbp":79,"glu_mean":148,"glu_night_min":76,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":7,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":2,"date":"2026-07-03","weight":77.7,"ankle_am":231.4,"ankle_pm":236.7,"bia":-0.6,"upright_h":6.6,"steps":3230,"spo2":95.4,"rest_hr":70,"sbp":125,"dbp":78,"glu_mean":151,"glu_night_min":97,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":3,"date":"2026-07-04","weight":77.7,"ankle_am":231.5,"ankle_pm":238.5,"bia":0.5,"upright_h":7.7,"steps":3650,"spo2":94.6,"rest_hr":68,"sbp":131,"dbp":77,"glu_mean":158,"glu_night_min":95,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":4,"date":"2026-07-05","weight":78.0,"ankle_am":231.1,"ankle_pm":234.8,"bia":-0.1,"upright_h":6.6,"steps":3110,"spo2":96.0,"rest_hr":70,"sbp":121,"dbp":75,"glu_mean":158,"glu_night_min":80,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":5,"date":"2026-07-06","weight":78.1,"ankle_am":231.8,"ankle_pm":237.7,"bia":-0.3,"upright_h":6.7,"steps":3460,"spo2":null,"rest_hr":69,"sbp":127,"dbp":77,"glu_mean":137,"glu_night_min":96,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[["no_night",{}]],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":6,"date":"2026-07-07","weight":78.0,"ankle_am":232.8,"ankle_pm":237.7,"bia":0.4,"upright_h":7.5,"steps":3470,"spo2":94.5,"rest_hr":69,"sbp":120,"dbp":71,"glu_mean":146,"glu_night_min":89,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":7,"date":"2026-07-08","weight":77.9,"ankle_am":231.9,"ankle_pm":236.3,"bia":0.5,"upright_h":7.2,"steps":3790,"spo2":null,"rest_hr":66,"sbp":128,"dbp":78,"glu_mean":137,"glu_night_min":98,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[["no_night",{}]],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":8,"date":"2026-07-09","weight":78.0,"ankle_am":230.4,"ankle_pm":233.5,"bia":0.3,"upright_h":6.5,"steps":3550,"spo2":93.9,"rest_hr":70,"sbp":119,"dbp":81,"glu_mean":140,"glu_night_min":102,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":11,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":9,"date":"2026-07-10","weight":78.3,"ankle_am":231.9,"ankle_pm":235.4,"bia":0.8,"upright_h":6.9,"steps":3500,"spo2":95.0,"rest_hr":68,"sbp":124,"dbp":76,"glu_mean":135,"glu_night_min":106,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":2,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":10,"date":"2026-07-11","weight":77.9,"ankle_am":232.0,"ankle_pm":236.0,"bia":-0.2,"upright_h":6.7,"steps":3390,"spo2":94.4,"rest_hr":66,"sbp":136,"dbp":76,"glu_mean":137,"glu_night_min":99,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":11,"date":"2026-07-12","weight":77.9,"ankle_am":232.0,"ankle_pm":235.7,"bia":-0.5,"upright_h":5.6,"steps":3340,"spo2":95.7,"rest_hr":67,"sbp":127,"dbp":74,"glu_mean":135,"glu_night_min":107,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":12,"date":"2026-07-13","weight":77.9,"ankle_am":231.8,"ankle_pm":235.9,"bia":0.0,"upright_h":6.6,"steps":3840,"spo2":96.2,"rest_hr":69,"sbp":130,"dbp":76,"glu_mean":133,"glu_night_min":104,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":false,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[["salty",{}]],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":13,"date":"2026-07-14","weight":78.1,"ankle_am":231.6,"ankle_pm":238.1,"bia":-0.9,"upright_h":7.7,"steps":3950,"spo2":96.0,"rest_hr":69,"sbp":132,"dbp":85,"glu_mean":168,"glu_night_min":87,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":14,"date":"2026-07-15","weight":78.0,"ankle_am":230.3,"ankle_pm":235.6,"bia":0.0,"upright_h":7.7,"steps":2980,"spo2":95.2,"rest_hr":68,"sbp":124,"dbp":73,"glu_mean":148,"glu_night_min":88,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":2,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":15,"date":"2026-07-16","weight":78.1,"ankle_am":231.2,"ankle_pm":234.3,"bia":0.1,"upright_h":6.2,"steps":3350,"spo2":94.9,"rest_hr":69,"sbp":130,"dbp":85,"glu_mean":133,"glu_night_min":103,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":16,"date":"2026-07-17","weight":77.9,"ankle_am":232.1,"ankle_pm":236.7,"bia":0.8,"upright_h":7.6,"steps":3570,"spo2":95.4,"rest_hr":64,"sbp":125,"dbp":71,"glu_mean":111,"glu_night_min":92,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":17,"date":"2026-07-18","weight":77.8,"ankle_am":232.0,"ankle_pm":237.1,"bia":0.0,"upright_h":7.9,"steps":3660,"spo2":96.0,"rest_hr":69,"sbp":129,"dbp":74,"glu_mean":156,"glu_night_min":91,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":18,"date":"2026-07-19","weight":78.0,"ankle_am":233.2,"ankle_pm":236.6,"bia":0.5,"upright_h":5.9,"steps":3710,"spo2":95.7,"rest_hr":63,"sbp":129,"dbp":78,"glu_mean":151,"glu_night_min":87,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":2,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":19,"date":"2026-07-20","weight":78.1,"ankle_am":231.6,"ankle_pm":235.7,"bia":-1.3,"upright_h":7.0,"steps":4180,"spo2":96.5,"rest_hr":70,"sbp":133,"dbp":80,"glu_mean":151,"glu_night_min":98,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":11,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":20,"date":"2026-07-21","weight":78.3,"ankle_am":231.5,"ankle_pm":235.7,"bia":1.1,"upright_h":7.4,"steps":3580,"spo2":95.8,"rest_hr":68,"sbp":126,"dbp":74,"glu_mean":149,"glu_night_min":103,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":21,"date":"2026-07-22","weight":78.0,"ankle_am":231.3,"ankle_pm":235.9,"bia":-0.5,"upright_h":5.7,"steps":3510,"spo2":95.8,"rest_hr":71,"sbp":126,"dbp":76,"glu_mean":152,"glu_night_min":96,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":4,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":22,"date":"2026-07-23","weight":78.0,"ankle_am":232.3,"ankle_pm":235.5,"bia":-0.8,"upright_h":6.8,"steps":3200,"spo2":96.3,"rest_hr":66,"sbp":133,"dbp":83,"glu_mean":153,"glu_night_min":100,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":12,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":23,"date":"2026-07-24","weight":77.8,"ankle_am":232.8,"ankle_pm":236.4,"bia":-0.6,"upright_h":7.0,"steps":4160,"spo2":95.0,"rest_hr":69,"sbp":127,"dbp":79,"glu_mean":154,"glu_night_min":94,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":5,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":24,"date":"2026-07-25","weight":78.1,"ankle_am":232.0,"ankle_pm":235.9,"bia":0.3,"upright_h":8.5,"steps":3820,"spo2":94.0,"rest_hr":65,"sbp":132,"dbp":80,"glu_mean":148,"glu_night_min":82,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":false,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":4,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[["salty",{}]],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":25,"date":"2026-07-26","weight":78.4,"ankle_am":231.1,"ankle_pm":235.7,"bia":-0.1,"upright_h":7.2,"steps":2760,"spo2":94.6,"rest_hr":68,"sbp":122,"dbp":82,"glu_mean":163,"glu_night_min":105,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":32,"streams":[],"cusum":0.1,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":26,"date":"2026-07-27","weight":77.9,"ankle_am":230.8,"ankle_pm":236.0,"bia":-0.1,"upright_h":6.7,"steps":3110,"spo2":95.6,"rest_hr":70,"sbp":119,"dbp":75,"glu_mean":152,"glu_night_min":99,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":27,"date":"2026-07-28","weight":77.8,"ankle_am":232.4,"ankle_pm":234.5,"bia":0.9,"upright_h":6.3,"steps":3910,"spo2":95.8,"rest_hr":71,"sbp":126,"dbp":77,"glu_mean":136,"glu_night_min":116,"hypo_no_response":false,"doses_due":5,"doses_taken":4,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":9,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":28,"date":"2026-07-29","weight":78.0,"ankle_am":232.8,"ankle_pm":235.2,"bia":0.8,"upright_h":5.7,"steps":3450,"spo2":95.6,"rest_hr":66,"sbp":125,"dbp":76,"glu_mean":149,"glu_night_min":92,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":29,"date":"2026-07-30","weight":null,"ankle_am":230.8,"ankle_pm":235.3,"bia":-0.5,"upright_h":7.0,"steps":3940,"spo2":94.7,"rest_hr":70,"sbp":125,"dbp":83,"glu_mean":141,"glu_night_min":99,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":2,"risk":0,"streams":["adherence"],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[["noweigh",{}]],"notes":[["no_weigh",{}]],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":["patient_voice","band_vibrate","family_message"],"calls":null},{"day":30,"date":"2026-07-31","weight":78.0,"ankle_am":231.1,"ankle_pm":235.9,"bia":0.0,"upright_h":7.5,"steps":3580,"spo2":96.1,"rest_hr":66,"sbp":128,"dbp":72,"glu_mean":158,"glu_night_min":87,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":false,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[["salty",{}]],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":31,"date":"2026-08-01","weight":78.2,"ankle_am":231.4,"ankle_pm":234.0,"bia":0.3,"upright_h":5.8,"steps":3190,"spo2":94.8,"rest_hr":67,"sbp":131,"dbp":75,"glu_mean":155,"glu_night_min":88,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":6,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":32,"date":"2026-08-02","weight":77.9,"ankle_am":232.1,"ankle_pm":236.9,"bia":1.3,"upright_h":7.2,"steps":3050,"spo2":94.7,"rest_hr":65,"sbp":123,"dbp":73,"glu_mean":159,"glu_night_min":103,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":2,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":33,"date":"2026-08-03","weight":78.3,"ankle_am":231.1,"ankle_pm":235.3,"bia":-0.8,"upright_h":4.7,"steps":3800,"spo2":95.2,"rest_hr":65,"sbp":123,"dbp":83,"glu_mean":160,"glu_night_min":93,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":8,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":34,"date":"2026-08-04","weight":78.0,"ankle_am":231.1,"ankle_pm":235.5,"bia":-0.0,"upright_h":6.9,"steps":3560,"spo2":96.3,"rest_hr":72,"sbp":127,"dbp":75,"glu_mean":149,"glu_night_min":91,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":1,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":35,"date":"2026-08-05","weight":78.1,"ankle_am":231.9,"ankle_pm":235.6,"bia":-0.7,"upright_h":6.9,"steps":3700,"spo2":95.2,"rest_hr":67,"sbp":129,"dbp":78,"glu_mean":134,"glu_night_min":97,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":36,"date":"2026-08-06","weight":77.6,"ankle_am":231.9,"ankle_pm":236.0,"bia":-0.3,"upright_h":7.1,"steps":3660,"spo2":94.7,"rest_hr":67,"sbp":125,"dbp":78,"glu_mean":136,"glu_night_min":98,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":37,"date":"2026-08-07","weight":77.9,"ankle_am":232.4,"ankle_pm":237.4,"bia":0.2,"upright_h":7.4,"steps":2970,"spo2":95.7,"rest_hr":67,"sbp":127,"dbp":80,"glu_mean":155,"glu_night_min":98,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":4,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":38,"date":"2026-08-08","weight":78.2,"ankle_am":232.8,"ankle_pm":237.3,"bia":-1.8,"upright_h":7.2,"steps":3010,"spo2":95.7,"rest_hr":65,"sbp":122,"dbp":76,"glu_mean":165,"glu_night_min":93,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":29,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":39,"date":"2026-08-09","weight":81.4,"ankle_am":231.4,"ankle_pm":236.3,"bia":0.3,"upright_h":6.8,"steps":2580,"spo2":95.5,"rest_hr":70,"sbp":124,"dbp":78,"glu_mean":159,"glu_night_min":101,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[["suspect",{"jump":3.2}]],"missed_diuretic":0,"suspect":true,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":40,"date":"2026-08-10","weight":78.1,"ankle_am":232.5,"ankle_pm":236.4,"bia":0.2,"upright_h":6.2,"steps":2980,"spo2":94.2,"rest_hr":67,"sbp":125,"dbp":75,"glu_mean":123,"glu_night_min":93,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":18,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[["fa_blocked",{}]],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":true,"under_review":false,"actions":[],"calls":null},{"day":41,"date":"2026-08-11","weight":78.0,"ankle_am":231.9,"ankle_pm":237.4,"bia":0.5,"upright_h":7.6,"steps":2550,"spo2":96.6,"rest_hr":70,"sbp":130,"dbp":79,"glu_mean":159,"glu_night_min":92,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":6,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":42,"date":"2026-08-12","weight":78.0,"ankle_am":233.1,"ankle_pm":237.6,"bia":1.0,"upright_h":7.0,"steps":3680,"spo2":94.7,"rest_hr":68,"sbp":127,"dbp":81,"glu_mean":163,"glu_night_min":84,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":4,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":43,"date":"2026-08-13","weight":77.7,"ankle_am":232.4,"ankle_pm":237.0,"bia":0.7,"upright_h":7.8,"steps":3790,"spo2":95.2,"rest_hr":70,"sbp":123,"dbp":75,"glu_mean":152,"glu_night_min":90,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":44,"date":"2026-08-14","weight":78.0,"ankle_am":231.5,"ankle_pm":235.4,"bia":0.8,"upright_h":6.7,"steps":3950,"spo2":97.0,"rest_hr":72,"sbp":128,"dbp":79,"glu_mean":168,"glu_night_min":95,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":1,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":45,"date":"2026-08-15","weight":77.9,"ankle_am":232.5,"ankle_pm":235.5,"bia":-0.1,"upright_h":5.7,"steps":3050,"spo2":95.5,"rest_hr":69,"sbp":126,"dbp":80,"glu_mean":139,"glu_night_min":93,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":46,"date":"2026-08-16","weight":77.9,"ankle_am":232.6,"ankle_pm":243.8,"bia":-0.7,"upright_h":10.5,"steps":2980,"spo2":95.1,"rest_hr":73,"sbp":133,"dbp":78,"glu_mean":159,"glu_night_min":112,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":28,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[["evening_swelling",{"mm":12,"h":10.5}],["band_tight",{}]],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":47,"date":"2026-08-17","weight":78.1,"ankle_am":233.5,"ankle_pm":240.1,"bia":0.4,"upright_h":7.5,"steps":3410,"spo2":95.9,"rest_hr":64,"sbp":131,"dbp":77,"glu_mean":155,"glu_night_min":101,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":6,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[["swelling_resolved",{"mm":12}]],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":true,"under_review":false,"actions":[],"calls":null},{"day":48,"date":"2026-08-18","weight":77.9,"ankle_am":231.7,"ankle_pm":233.8,"bia":0.9,"upright_h":6.7,"steps":3370,"spo2":null,"rest_hr":70,"sbp":138,"dbp":78,"glu_mean":128,"glu_night_min":89,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[["no_night",{}]],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":49,"date":"2026-08-19","weight":77.6,"ankle_am":232.2,"ankle_pm":236.9,"bia":-0.2,"upright_h":7.3,"steps":3030,"spo2":95.3,"rest_hr":67,"sbp":125,"dbp":72,"glu_mean":150,"glu_night_min":111,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":50,"date":"2026-08-20","weight":77.9,"ankle_am":231.9,"ankle_pm":237.0,"bia":0.1,"upright_h":8.2,"steps":3580,"spo2":95.1,"rest_hr":68,"sbp":123,"dbp":77,"glu_mean":177,"glu_night_min":52,"hypo_no_response":true,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":3,"risk":0,"streams":["glucose"],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[["hypo",{"v":52}]],"notes":[["no_response",{}]],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":["patient_voice","band_vibrate","family_message","call_chain"],"calls":{"acknowledged":true,"by":"sara","log":[{"round":1,"contact":"khalid","relation":"son","status":"no_answer","seconds":30},{"round":1,"contact":"sara","relation":"daughter","status":"confirmed","seconds":42}],"message":"تنبيه عاجل من كارديو قارد. سكر الوالد صالح نازل، 52 ملغ، وما ردّ على التنبيه الصوتي. نرجو تتصل عليه أو تروح له الآن، وإذا ما استجاب اتصل على تسعة تسعة سبعة. للتأكيد اضغط واحد."}},{"day":51,"date":"2026-08-21","weight":77.8,"ankle_am":232.2,"ankle_pm":236.8,"bia":1.1,"upright_h":6.8,"steps":3950,"spo2":94.9,"rest_hr":68,"sbp":125,"dbp":83,"glu_mean":127,"glu_night_min":91,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":false,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[["salty",{}]],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":52,"date":"2026-08-22","weight":78.3,"ankle_am":231.8,"ankle_pm":234.8,"bia":0.4,"upright_h":5.7,"steps":3890,"spo2":94.8,"rest_hr":64,"sbp":126,"dbp":73,"glu_mean":142,"glu_night_min":99,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":3,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":53,"date":"2026-08-23","weight":77.7,"ankle_am":231.0,"ankle_pm":235.6,"bia":-0.5,"upright_h":6.4,"steps":2710,"spo2":94.0,"rest_hr":69,"sbp":127,"dbp":79,"glu_mean":151,"glu_night_min":101,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":26,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":54,"date":"2026-08-24","weight":78.1,"ankle_am":231.9,"ankle_pm":236.4,"bia":0.1,"upright_h":7.3,"steps":3050,"spo2":94.4,"rest_hr":71,"sbp":129,"dbp":74,"glu_mean":129,"glu_night_min":94,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":24,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":55,"date":"2026-08-25","weight":77.9,"ankle_am":232.0,"ankle_pm":237.8,"bia":1.8,"upright_h":7.4,"steps":3320,"spo2":94.7,"rest_hr":67,"sbp":124,"dbp":81,"glu_mean":136,"glu_night_min":92,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":56,"date":"2026-08-26","weight":77.9,"ankle_am":231.7,"ankle_pm":235.3,"bia":-0.1,"upright_h":5.3,"steps":3050,"spo2":94.2,"rest_hr":67,"sbp":132,"dbp":80,"glu_mean":149,"glu_night_min":89,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":false,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":5,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[["salty",{}]],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":57,"date":"2026-08-27","weight":77.9,"ankle_am":232.9,"ankle_pm":237.8,"bia":0.7,"upright_h":8.2,"steps":3680,"spo2":null,"rest_hr":68,"sbp":140,"dbp":81,"glu_mean":144,"glu_night_min":95,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[["no_night",{}]],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":58,"date":"2026-08-28","weight":77.7,"ankle_am":232.1,"ankle_pm":237.8,"bia":0.2,"upright_h":6.8,"steps":3610,"spo2":96.0,"rest_hr":66,"sbp":132,"dbp":85,"glu_mean":159,"glu_night_min":98,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":59,"date":"2026-08-29","weight":78.0,"ankle_am":231.7,"ankle_pm":236.7,"bia":-0.2,"upright_h":7.4,"steps":3880,"spo2":95.5,"rest_hr":68,"sbp":122,"dbp":78,"glu_mean":161,"glu_night_min":88,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":60,"date":"2026-08-30","weight":78.0,"ankle_am":233.9,"ankle_pm":239.9,"bia":-0.2,"upright_h":6.2,"steps":3490,"spo2":95.9,"rest_hr":68,"sbp":129,"dbp":83,"glu_mean":134,"glu_night_min":104,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":4,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":61,"date":"2026-08-31","weight":77.9,"ankle_am":232.0,"ankle_pm":237.2,"bia":-0.4,"upright_h":7.2,"steps":3880,"spo2":93.9,"rest_hr":70,"sbp":131,"dbp":79,"glu_mean":151,"glu_night_min":104,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":15,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":62,"date":"2026-09-01","weight":78.1,"ankle_am":230.9,"ankle_pm":236.5,"bia":-0.4,"upright_h":6.8,"steps":4050,"spo2":94.6,"rest_hr":71,"sbp":128,"dbp":73,"glu_mean":146,"glu_night_min":103,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":15,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":63,"date":"2026-09-02","weight":78.1,"ankle_am":232.0,"ankle_pm":235.7,"bia":-0.3,"upright_h":6.5,"steps":3730,"spo2":95.4,"rest_hr":68,"sbp":125,"dbp":77,"glu_mean":163,"glu_night_min":98,"hypo_no_response":false,"doses_due":5,"doses_taken":4,"diuretic_taken":false,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":1,"risk":0,"streams":["adherence"],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[["dose",{"n":1}]],"notes":[],"missed_diuretic":1,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":["patient_voice","band_vibrate"],"calls":null},{"day":64,"date":"2026-09-03","weight":78.4,"ankle_am":231.7,"ankle_pm":237.7,"bia":1.2,"upright_h":6.3,"steps":3910,"spo2":94.0,"rest_hr":66,"sbp":131,"dbp":81,"glu_mean":159,"glu_night_min":95,"hypo_no_response":false,"doses_due":5,"doses_taken":4,"diuretic_taken":false,"diet_ok":false,"breathless":false,"swelling_visible":false,"reviewed":false,"level":2,"risk":21,"streams":["adherence"],"cusum":0.1,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[["dose",{"n":2}]],"notes":[["salty",{}]],"missed_diuretic":2,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":["patient_voice","band_vibrate","family_message"],"calls":null},{"day":65,"date":"2026-09-04","weight":78.4,"ankle_am":233.6,"ankle_pm":237.4,"bia":-0.1,"upright_h":7.4,"steps":2490,"spo2":94.8,"rest_hr":67,"sbp":129,"dbp":74,"glu_mean":139,"glu_night_min":83,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":42,"streams":[],"cusum":0.2,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":true},"reasons":[["activity",{"pct":66}]],"notes":[],"missed_diuretic":2,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":66,"date":"2026-09-05","weight":78.9,"ankle_am":234.3,"ankle_pm":238.1,"bia":-1.1,"upright_h":6.0,"steps":3500,"spo2":95.3,"rest_hr":70,"sbp":125,"dbp":77,"glu_mean":151,"glu_night_min":89,"hypo_no_response":false,"doses_due":5,"doses_taken":4,"diuretic_taken":false,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":1,"risk":38,"streams":["adherence"],"cusum":0.8,"congestion":false,"signals":{"weight":true,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[["weight",{"dev":0.9}],["dose",{"n":3}]],"notes":[],"missed_diuretic":3,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":["patient_voice","band_vibrate"],"calls":null},{"day":67,"date":"2026-09-06","weight":79.0,"ankle_am":235.1,"ankle_pm":241.0,"bia":-2.0,"upright_h":6.0,"steps":2570,"spo2":95.4,"rest_hr":73,"sbp":122,"dbp":76,"glu_mean":155,"glu_night_min":96,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":52,"streams":[],"cusum":1.5,"congestion":false,"signals":{"weight":true,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[["weight",{"dev":1.0}],["trend",{"c":1.5}]],"notes":[],"missed_diuretic":2,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":68,"date":"2026-09-07","weight":79.5,"ankle_am":236.0,"ankle_pm":237.5,"bia":-3.2,"upright_h":3.5,"steps":2740,"spo2":94.0,"rest_hr":70,"sbp":116,"dbp":73,"glu_mean":125,"glu_night_min":88,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":1,"risk":70,"streams":["clinical"],"cusum":2.7,"congestion":true,"signals":{"weight":true,"ankle":true,"oxygen":false,"heart":false,"activity":false},"reasons":[["weight",{"dev":1.5}],["trend",{"c":2.7}],["ankle",{"mm":4.3,"bia":-3.1}]],"notes":[],"missed_diuretic":1,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":["patient_voice","band_vibrate"],"calls":null},{"day":69,"date":"2026-09-08","weight":79.7,"ankle_am":237.7,"ankle_pm":241.5,"bia":-2.6,"upright_h":5.0,"steps":2220,"spo2":93.5,"rest_hr":74,"sbp":119,"dbp":78,"glu_mean":147,"glu_night_min":103,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":2,"risk":85,"streams":["clinical"],"cusum":4.1,"congestion":true,"signals":{"weight":true,"ankle":true,"oxygen":false,"heart":false,"activity":true},"reasons":[["weight",{"dev":1.7}],["trend",{"c":4.1}],["ankle",{"mm":6.0,"bia":-2.5}],["activity",{"pct":68}]],"notes":[],"missed_diuretic":1,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":["patient_voice","band_vibrate","family_message"],"calls":null},{"day":70,"date":"2026-09-09","weight":80.2,"ankle_am":238.2,"ankle_pm":241.2,"bia":-5.5,"upright_h":5.0,"steps":1960,"spo2":93.1,"rest_hr":80,"sbp":129,"dbp":72,"glu_mean":140,"glu_night_min":93,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":3,"risk":100,"streams":["clinical"],"cusum":6.0,"congestion":true,"signals":{"weight":true,"ankle":true,"oxygen":false,"heart":true,"activity":true},"reasons":[["weight",{"dev":2.2}],["trend",{"c":6.0}],["ankle",{"mm":6.5,"bia":-5.3}],["heart",{"v":80,"b":69}],["activity",{"pct":65}]],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":["patient_voice","band_vibrate","family_message","doctor_report","call_chain"],"calls":{"acknowledged":true,"by":"khalid","log":[{"round":1,"contact":"khalid","relation":"son","status":"confirmed","seconds":42}],"message":"تنبيه من كارديو قارد. الوالد صالح عنده علامات احتباس سوائل مستمرة من ثلاثة أيام، وأرسلنا تقريراً لطبيبته. نرجو تطمّن عليه اليوم. للتأكيد اضغط واحد."}},{"day":71,"date":"2026-09-10","weight":80.8,"ankle_am":239.1,"ankle_pm":240.5,"bia":-5.8,"upright_h":4.6,"steps":1700,"spo2":91.0,"rest_hr":77,"sbp":120,"dbp":77,"glu_mean":172,"glu_night_min":105,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":true,"swelling_visible":false,"reviewed":false,"level":3,"risk":100,"streams":["clinical"],"cusum":8.5,"congestion":true,"signals":{"weight":true,"ankle":true,"oxygen":true,"heart":true,"activity":true},"reasons":[["weight",{"dev":2.8}],["trend",{"c":8.5}],["ankle",{"mm":7.4,"bia":-5.6}],["oxygen",{"v":91,"b":95}],["heart",{"v":77,"b":69}],["activity",{"pct":61}]],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":["patient_voice","band_vibrate","family_message","doctor_report"],"calls":null},{"day":72,"date":"2026-09-11","weight":80.9,"ankle_am":239.8,"ankle_pm":243.1,"bia":-7.8,"upright_h":2.7,"steps":1550,"spo2":91.4,"rest_hr":77,"sbp":121,"dbp":76,"glu_mean":153,"glu_night_min":94,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":true,"swelling_visible":true,"reviewed":false,"level":3,"risk":100,"streams":["clinical"],"cusum":11.1,"congestion":true,"signals":{"weight":true,"ankle":true,"oxygen":true,"heart":true,"activity":true},"reasons":[["weight",{"dev":2.9}],["trend",{"c":11.1}],["ankle",{"mm":8.1,"bia":-7.6}],["oxygen",{"v":91,"b":95}],["heart",{"v":77,"b":69}],["activity",{"pct":63}]],"notes":[["band_tight",{}]],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":["patient_voice","band_vibrate","family_message","doctor_report"],"calls":null},{"day":73,"date":"2026-09-12","weight":80.4,"ankle_am":238.7,"ankle_pm":240.8,"bia":-4.4,"upright_h":4.2,"steps":2040,"spo2":93.0,"rest_hr":74,"sbp":133,"dbp":84,"glu_mean":132,"glu_night_min":98,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":true,"swelling_visible":false,"reviewed":true,"level":1,"risk":60,"streams":["clinical"],"cusum":13.2,"congestion":true,"signals":{"weight":true,"ankle":true,"oxygen":false,"heart":false,"activity":false},"reasons":[["weight",{"dev":2.4}],["trend",{"c":13.2}],["ankle",{"mm":7.0,"bia":-4.2}]],"notes":[["reviewed",{}],["improving",{}]],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":true,"actions":["patient_voice","band_vibrate"],"calls":null},{"day":74,"date":"2026-09-13","weight":80.0,"ankle_am":237.6,"ankle_pm":240.1,"bia":-3.4,"upright_h":4.6,"steps":1770,"spo2":93.1,"rest_hr":73,"sbp":118,"dbp":76,"glu_mean":139,"glu_night_min":95,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":1,"risk":60,"streams":["clinical"],"cusum":1.7,"congestion":true,"signals":{"weight":true,"ankle":true,"oxygen":false,"heart":false,"activity":false},"reasons":[["weight",{"dev":2.0}],["trend",{"c":1.7}],["ankle",{"mm":5.9,"bia":-3.2}]],"notes":[["improving",{}]],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":true,"actions":["patient_voice","band_vibrate"],"calls":null},{"day":75,"date":"2026-09-14","weight":79.5,"ankle_am":235.9,"ankle_pm":240.2,"bia":-3.5,"upright_h":5.4,"steps":2630,"spo2":94.9,"rest_hr":72,"sbp":121,"dbp":75,"glu_mean":142,"glu_night_min":97,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":1,"risk":60,"streams":["clinical"],"cusum":2.9,"congestion":true,"signals":{"weight":true,"ankle":true,"oxygen":false,"heart":false,"activity":false},"reasons":[["weight",{"dev":1.5}],["trend",{"c":2.9}],["ankle",{"mm":4.2,"bia":-3.4}]],"notes":[["improving",{}]],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":true,"actions":["patient_voice","band_vibrate"],"calls":null},{"day":76,"date":"2026-09-15","weight":78.4,"ankle_am":234.5,"ankle_pm":239.1,"bia":-1.2,"upright_h":5.4,"steps":2280,"spo2":93.6,"rest_hr":69,"sbp":135,"dbp":78,"glu_mean":150,"glu_night_min":104,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":42,"streams":[],"cusum":3.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":77,"date":"2026-09-16","weight":78.4,"ankle_am":232.0,"ankle_pm":236.7,"bia":-1.2,"upright_h":7.2,"steps":3180,"spo2":95.0,"rest_hr":69,"sbp":139,"dbp":75,"glu_mean":149,"glu_night_min":95,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":23,"streams":[],"cusum":3.1,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":78,"date":"2026-09-17","weight":77.9,"ankle_am":232.4,"ankle_pm":236.2,"bia":-0.7,"upright_h":5.7,"steps":3250,"spo2":95.1,"rest_hr":68,"sbp":131,"dbp":76,"glu_mean":147,"glu_night_min":81,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":3,"streams":[],"cusum":2.7,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":79,"date":"2026-09-18","weight":77.9,"ankle_am":231.4,"ankle_pm":236.0,"bia":-0.0,"upright_h":7.2,"steps":3460,"spo2":95.3,"rest_hr":64,"sbp":127,"dbp":75,"glu_mean":143,"glu_night_min":98,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":2.3,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":80,"date":"2026-09-19","weight":78.2,"ankle_am":233.1,"ankle_pm":238.1,"bia":-0.1,"upright_h":7.9,"steps":4030,"spo2":96.0,"rest_hr":65,"sbp":129,"dbp":76,"glu_mean":146,"glu_night_min":82,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":9,"streams":[],"cusum":2.2,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":81,"date":"2026-09-20","weight":78.2,"ankle_am":231.3,"ankle_pm":236.2,"bia":-0.2,"upright_h":6.9,"steps":2990,"spo2":95.8,"rest_hr":72,"sbp":128,"dbp":73,"glu_mean":140,"glu_night_min":84,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":13,"streams":[],"cusum":2.1,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":82,"date":"2026-09-21","weight":77.7,"ankle_am":231.7,"ankle_pm":235.9,"bia":-0.2,"upright_h":7.5,"steps":4080,"spo2":null,"rest_hr":69,"sbp":134,"dbp":82,"glu_mean":164,"glu_night_min":107,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":1.5,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[["no_night",{}]],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":83,"date":"2026-09-22","weight":78.1,"ankle_am":231.7,"ankle_pm":235.1,"bia":1.0,"upright_h":6.7,"steps":3950,"spo2":95.9,"rest_hr":68,"sbp":133,"dbp":82,"glu_mean":154,"glu_night_min":76,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":1.3,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":84,"date":"2026-09-23","weight":78.0,"ankle_am":231.1,"ankle_pm":238.3,"bia":-0.3,"upright_h":8.0,"steps":3420,"spo2":94.5,"rest_hr":68,"sbp":130,"dbp":76,"glu_mean":159,"glu_night_min":92,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":1.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":85,"date":"2026-09-24","weight":77.9,"ankle_am":234.3,"ankle_pm":238.3,"bia":1.0,"upright_h":7.3,"steps":3560,"spo2":95.4,"rest_hr":68,"sbp":132,"dbp":81,"glu_mean":165,"glu_night_min":99,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":3,"streams":[],"cusum":0.6,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":86,"date":"2026-09-25","weight":78.1,"ankle_am":232.8,"ankle_pm":239.6,"bia":0.1,"upright_h":8.1,"steps":3760,"spo2":94.4,"rest_hr":66,"sbp":121,"dbp":84,"glu_mean":140,"glu_night_min":106,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":6,"streams":[],"cusum":0.4,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":87,"date":"2026-09-26","weight":78.0,"ankle_am":232.1,"ankle_pm":236.1,"bia":-0.0,"upright_h":6.8,"steps":3630,"spo2":96.5,"rest_hr":65,"sbp":129,"dbp":75,"glu_mean":152,"glu_night_min":103,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":0,"streams":[],"cusum":0.1,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":88,"date":"2026-09-27","weight":78.2,"ankle_am":232.1,"ankle_pm":233.8,"bia":-0.5,"upright_h":6.5,"steps":3300,"spo2":95.6,"rest_hr":71,"sbp":129,"dbp":79,"glu_mean":133,"glu_night_min":107,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":22,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null},{"day":89,"date":"2026-09-28","weight":77.7,"ankle_am":232.6,"ankle_pm":238.8,"bia":0.4,"upright_h":7.7,"steps":4630,"spo2":94.7,"rest_hr":71,"sbp":122,"dbp":77,"glu_mean":153,"glu_night_min":103,"hypo_no_response":false,"doses_due":5,"doses_taken":5,"diuretic_taken":true,"diet_ok":true,"breathless":false,"swelling_visible":false,"reviewed":false,"level":0,"risk":16,"streams":[],"cusum":0.0,"congestion":false,"signals":{"weight":false,"ankle":false,"oxygen":false,"heart":false,"activity":false},"reasons":[],"notes":[],"missed_diuretic":0,"suspect":false,"false_alarm_blocked":false,"under_review":false,"actions":[],"calls":null}]};
+/* All interface text in Arabic and English. {name} = value filled at runtime. */
+const T = {
+ar: {
+  tagline: "إنذار مبكر ومتابعة منزلية لمرضى قصور القلب",
+  tab_patient: "المريض", tab_band: "السوار", tab_family: "الأسرة", tab_doctor: "تقرير الطبيب", tab_how: "كيف يعمل",
+  day: "اليوم", of: "من",
+  sc_normal: "يوم طبيعي", sc_false: "خطأ ميزان", sc_wedding: "وقوف طويل في عزيمة", sc_sugar: "هبوط سكر ليلي", sc_episode: "احتباس سوائل", sc_after: "بعد العلاج",
+  sim_note: "عرض توضيحي: بيانات محاكاة لمريض افتراضي مبنية على أنماط منشورة. المحرك والنماذج ومنطق الاتصال التلقائي تعمل فعلياً، وعتبات السوار افتراضية تحتاج تحقق سريري.",
+  patient_name: "العم صالح", patient_short: "عم صالح", physician: "د. سارة العتيبي",
+  dx: "قصور القلب المزمن + ارتفاع الضغط + السكري النوع الثاني", years: "سنة",
+  contact_khalid: "خالد (ابنه)", contact_sara: "سارة (بنته)", contact_nurse: "الممرض المنزلي",
+  hello: "صباح الخير يا",
+  st0: "كل شيء ممتاز", st1: "انتبه اليوم", st2: "أبلغنا خالد", st3: "أبلغنا الطبيبة والأسرة", st4: "اتصل بالطوارئ الآن", st_glu: "سكرك نازل",
+  sm0: "مؤشراتك اليوم ضمن المعتاد. استمر على خطتك، الله يعطيك العافية.",
+  sm1: "لاحظنا تغيّر بسيط في وزنك وكاحلك. خلنا نلتزم اليوم بخطة الطبيبة في الملح والسوائل والدواء، ونعيد القياس بكرة الصبح.",
+  sm1r: "الطبيبة راجعت حالتك وعدّلت الخطة، والمؤشرات تتحسن. استمر.",
+  sm2: "التغيّر مستمر من يومين. أرسلنا ملخص لخالد عشان يطمّن عليك.",
+  sm3: "أرسلنا تقريراً لطبيبتك، واتصلنا بخالد يطمّن عليك اليوم.",
+  sm4: "مؤشراتك خطيرة. اتصل بالهلال الأحمر 997 الآن، وأسرتك تم الاتصال بها.",
+  sm_glu: "سكرك نازل الليلة. خذ مصدر سكر سريع مثل نص كوب عصير، وأعد القياس بعد ربع ساعة.",
+  sm_glu3: "سكرك نازل وما رديت علينا، فاتصلنا بسارة وهي جاية. خذ نص كوب عصير الحين.",
+  sm_dose: "ما تأكدنا إنك أخذت دواء المدر. خذه الحين وقول «أخذته».",
+  sm_dose2: "صار أكثر من يوم بدون تأكيد دواء المدر. أرسلنا رسالة لخالد يذكّرك.",
+  sm_noweigh: "ما وصلنا وزنك اليوم. قِف على الميزان بس، والباقي علينا. أرسلنا تذكير لخالد.",
+  listen: "🔊 اسمع", call997: "📞 997",
+  r_weight: "الوزن", r_ankle: "الكاحل صباحاً", r_spo2: "الأكسجين الليلي", r_hr: "النبض", r_glu: "السكر", r_bp: "الضغط", r_steps: "خطوة",
+  src_scale: "الميزان", src_band: "السوار", src_cgm: "حساس السكر", src_cuff: "جهاز الضغط",
+  usual: "المعتاد", kg: "كجم", mm: "ملم", per_min: "/د", mgdl: "ملغ/دل", night_low: "أقل ليلاً",
+  meds: "أدويتي اليوم", take: "أخذته", taken: "✓ تم", confirmed_voice: "✓ بالصوت", med_voice: "🎙️ التأكيد بالصوت: قل «أخذته»",
+  diet: "أكلي اليوم", breakfast: "فطور", lunch: "غداء", dinner: "عشاء",
+  limits_salt: "الملح: حسب حد الطبيبة", limits_fluid: "السوائل: حسب حد الطبيبة", limits_carb: "النشويات: حسب خطة السكري",
+  week_plan: "الجدول الغذائي الأسبوعي (يتكرر شهرياً)", show_week: "عرض الأسبوع كامل ›", show_no: "الممنوعات وبدائلها ›", hide_no: "إخفاء الممنوعات",
+  diet_disc: "نموذج مقترح من الفريق. الحدود والكميات النهائية يحددها الطبيب المعالج أو أخصائي التغذية لكل مريض.",
+  share_doc: "📋 عرض تقريري لأي طبيب", share_title: "شارك التقرير مع أي طبيب", share_text: "يمسح الطبيب الرمز ويفتح التقرير الكامل، حتى لو كان أول مرة يشوف المريض.", open_report: "فتح التقرير",
+  voice_title: "المساعد الصوتي (الجوال أو سماعة البيت)", voice_sub: "العم صالح ما يكتب شيء: النظام يكلمه بلهجته ويسمع رده. اضغط 🎙️ وتكلم (يعمل في Chrome)، أو استخدم أزرار الرد للتجربة.",
+  v_med: "يا عم صالح، حان موعد دواء الضغط والمدر. بشّر، أخذت علاجك؟", v_med_yes: "الله يعطيك العافية، سجّلت إنك أخذت علاجك.", v_med_no: "أبشر، بذكّرك مرة ثانية بعد نص ساعة.",
+  v_alert: "يا عم صالح، لاحظنا زيادة في وزنك وكاحلك. تحس بضيق نفس أو تورّم؟", v_alert_yes: "سلامتك. أبلغنا خالد والطبيبة يتابعون معك.", v_alert_no: "الحمد لله. خفّف الملح اليوم والتزم بخطة الطبيبة، وبكرة نعيد القياس.",
+  v_weigh: "صباح الخير يا عم صالح، قِف على الميزان دقيقة الله يعافيك.", v_sugar: "يا عم صالح، سكرك نازل. خذ نص كوب عصير الحين، وبعد ربع ساعة نقيس مرة ثانية.",
+  v_emerg: "يا عم صالح، مؤشراتك خطيرة. اتصل على تسعة تسعة سبعة الآن. أسرتك في الطريق.",
+  say_yes: "«إيه أخذته»", say_no: "«لا، بعدين»", say_fine: "«لا، الحمد لله»", say_bad: "«إيه، أحس بضيق»",
+  mic: "🎙️ رد بصوتك", listening: "أسمعك…", heard: "سمعت:", no_mic: "التعرّف على الصوت غير مدعوم في هذا المتصفح، استخدم أزرار الرد.",
+  t_med: "دواء", t_weigh: "وزن", t_sugar: "سكر", t_alert: "تنبيه", t_emerg: "طوارئ",
+  hearing_mode: "خيار لضعاف السمع: ألوان على الشاشة + اهتزاز السوار بدل الصوت",
+  legend_title: "دليل الألوان واهتزاز السوار",
+  lg_med: "موعد دواء", lg_measure: "قياس الوزن أو الضغط", lg_sugar: "هبوط السكر", lg_ok: "تم / كل شيء طبيعي", lg_warn: "انتبه: تغيّر في المؤشرات", lg_crit: "طوارئ",
+  eng_title: "محرك الذكاء الاصطناعي: قرار اليوم", risk: "درجة الشذوذ (Isolation Forest)", cusum_l: "مؤشر اتجاه الوزن (CUSUM)", cusum_h: "حد التنبيه",
+  s_weight: "الوزن", s_ankle: "الكاحل", s_oxygen: "الأكسجين", s_heart: "النبض", s_activity: "النشاط",
+  L1: "١ · المريض", L2: "٢ · رسالة للأسرة", L3: "٣ · اتصال + الطبيب", L4: "🚨 طوارئ",
+  why: "الأسباب", no_reasons: "لا توجد إشارات مقلقة. كل المؤشرات قريبة من الأساس الشخصي.",
+  single_note: "إشارة واحدة لوحدها لا تكفي للتصعيد.",
+  rs_weight: "الوزن أعلى من المعتاد بـ {dev} كجم", rs_trend: "اتجاه تصاعدي مستمر في الوزن (CUSUM {c})",
+  rs_ankle: "الكاحل صباحاً أكبر من المعتاد بـ {mm} ملم، والسوائل في الساق {bia}%",
+  rs_oxygen: "الأكسجين الليلي {v}% (المعتاد {b}%)", rs_heart: "نبض الراحة {v} (المعتاد {b})", rs_activity: "النشاط {pct}% من متوسط الأسبوع",
+  rs_hypo: "هبوط سكر ليلي {v} ملغ/دل", rs_dose: "دواء المدر لم يتأكد ({n} خلال 4 أيام)", rs_noweigh: "لم يُقَس الوزن اليوم",
+  nt_suspect: "قفزة وزن {jump} كجم في يوم: قراءة مشكوك فيها، طُلب إعادة القياس ولم يُرسل أي تنبيه",
+  nt_fa_blocked: "الوزن رجع لطبيعته: قراءة الأمس خطأ قياس وتم تجاهلها (إنذار كاذب تم منعه)",
+  nt_no_night: "لا توجد قراءات ليلية من السوار (كان على الشاحن)", nt_no_weigh: "لا توجد قراءة وزن اليوم",
+  nt_evening_swelling: "تورّم مسائي {mm} ملم بعد {h} ساعات وقوف وجلوس. غالباً طبيعي، نتأكد صباح بكرة قبل أي تنبيه",
+  nt_swelling_resolved: "تورّم الأمس ({mm} ملم) زال مع النوم: كان من الوقوف، مو احتباس. لم يُرسل أي تنبيه",
+  nt_band_tight: "السوار صار ضيق: طلبنا من المريض يفكّه درجة حمايةً للجلد",
+  nt_reviewed: "الطبيبة راجعت الحالة وعدّلت الخطة", nt_improving: "تحت متابعة الطبيبة: المؤشرات تتحسن",
+  nt_salty: "المريض أفاد بأكل مالح", nt_dose_unconfirmed: "دواء المدر لم يتأكد اليوم",
+  nt_no_response: "العم صالح ما ردّ على التنبيه الصوتي خلال 10 دقائق",
+  stream_clinical: "سريري", stream_glucose: "سكر", stream_adherence: "التزام",
+  drag_hint: "اسحب لتدوير السوار", swell_sim: "جرّب: محاكاة تورّم الكاحل",
+  swell_ok: "ضمن المعتاد. لا تنبيه.", swell_watch: "زيادة بسيطة: المحرك يقارنها بالوزن وقراءة الصباح.", swell_sig: "إشارة كاحل: تتأكد مع الوزن قبل أي تنبيه.", swell_tight: "السوار صار ضيق: يطلب من المريض يفكّه درجة.",
+  band_title: "سوار CardioGuard للكاحل", band_sub: "تصميم مقترح يلبس فوق عظمة الكاحل بشوي، من سيليكون طبي ناعم ومقاوم للماء، ويشحن لاسلكياً بجنب السرير.",
+  band_sensors: "ماذا يقيس السوار؟",
+  bs_stretch_t: "حساس تمدد", bs_stretch: "يقيس محيط الكاحل بالمليمتر. يلقط التورّم البسيط قبل ما يصير ظاهر، وينبّه إذا السوار صار ضيق.",
+  bs_bia_t: "معاوقة حيوية", bs_bia: "تيار ضعيف جداً وآمن يقدّر كمية السوائل في أنسجة الساق. نفس مبدأ موازين تحليل الجسم.",
+  bs_motion_t: "حساس حركة ووضعية", bs_motion: "الخطوات، وهل المريض واقف أو مستلقي. هذا اللي يفرّق تورّم الوقوف الطبيعي عن الاحتباس.",
+  bs_optical_t: "حساس ضوئي", bs_optical: "النبض، والأكسجين الليلي كمؤشر داعم (القياس من الكاحل أقل دقة من الإصبع).",
+  bs_vib_t: "محرك اهتزاز", bs_vib: "نمط اهتزاز مختلف لكل نوع تنبيه، مفيد لضعاف السمع.",
+  live_am: "الكاحل صباحاً", live_pm: "الكاحل مساءً", live_bia: "سوائل الساق", live_up: "وقوف وجلوس", live_spo2: "أكسجين ليلي", live_bat: "البطارية", hours: "ساعة",
+  band_safety_t: "تصميم آمن لمرضى السكري", band_safety: "مريض السكري ممكن ما يحس بالضغط بسبب ضعف الأعصاب، فالسوار ناعم وواسع، وحساس التمدد نفسه ينبّه إذا صار ضيق، والتطبيق يذكّر بفحص الجلد كل أسبوع. لا يُستخدم مع قرحة في القدم أو ضعف تروية شديد إلا بقرار الطبيب.",
+  band_research: "مبني على أبحاث أولية: SwellFit (جامعة هارفارد 2016)، Smart-Sock (جامعة ولاية واشنطن)، وسوار كاحل بالمعاوقة الحيوية (مجلة Sensors 2024). كلها بعيّنات صغيرة، والعتبات هنا افتراضية تحتاج تحقق سريري.",
+  fam_hi: "مرحباً خالد", fam_status: "حالة الوالد",
+  fam_s0: "مستقر", fam_s1: "تغيّر بسيط، الوالد تلقى تنبيه", fam_s2: "يحتاج متابعتك اليوم", fam_s3: "تم إبلاغ الطبيبة، طمّن عليه", fam_s4: "طوارئ",
+  fam_week: "آخر 7 أيام", fam_adh: "الالتزام بالدواء هذا الأسبوع", fam_feed: "آخر التنبيهات", fam_call: "📞 اتصل بالوالد", fam_doc: "اتصل بالعيادة",
+  feed_none: "لا توجد تنبيهات حتى الآن", fa_feed: "تم تجاهل قراءة وزن خاطئة (لا داعي للقلق)", wedding_feed: "تورّم مسائي بعد العزيمة زال مع النوم (لا داعي للقلق)",
+  esc_title: "مستويات التصعيد",
+  fam_why_t: "الأسرة أقرب وأسرع من المستشفى. المستوى ٢ رسالة فقط، والاتصال التلقائي فقط عند الخطر (المستوى ٣ أو طوارئ أو هبوط سكر بدون رد)، عشان ما نزعج الأسرة على كل شيء ولا نغرق الطبيب بتنبيهات.",
+  call_title: "الاتصال التلقائي بالأسرة",
+  call_how: "عند الخطر يتصل النظام تلقائياً بالأسرة بالترتيب، ويقرأ رسالة صوتية بالعربي. أول ما أحد يضغط ١ للتأكيد يوقف الاتصال. إذا ما أحد أكّد، يعيد القائمة مرة ثانية ثم يرسل رسالة للجميع.",
+  call_none: "لا يوجد اتصال تلقائي في هذا اليوم. جرّب سيناريو «هبوط سكر ليلي» أو «احتباس سوائل».",
+  call_trigger: "سبب الاتصال", call_order: "ترتيب الاتصال",
+  cs_confirmed: "ضغط ١ وأكّد", cs_no_answer: "لم يرد", cs_answered_no_confirm: "رد بدون تأكيد", cs_busy: "مشغول", cs_failed: "تعذّر", cs_skip: "لم يُتصل به",
+  sec: "ث", try_call: "▶ جرّب المكالمة كما تصل لخالد", incoming_sub: "اتصال تلقائي · تنبيه صحي", press1: "١", decline: "✕", confirmed_txt: "✓ تم التأكيد. شكراً لك.",
+  call_note: "المكالمة تخرج من خادم سحابي (Twilio)، فتوصل لأي جوال بدون تطبيق. النظام لا يتصل على 997 بنفسه: يطلب من الأسرة الاتصال، والربط المباشر مع الهلال الأحمر يحتاج اتفاقية رسمية (مستقبلاً).",
+  doc_title: "التقرير السريري", p30: "آخر 30 يوم", p90: "آخر 90 يوم", print: "تصدير PDF",
+  name: "المريض", age: "العمر", diagnosis: "التشخيص", meds_l: "الأدوية الحالية", dr: "الطبيب المعالج", base_l: "الأساس الشخصي",
+  ai_summary: "ملخص الذكاء الاصطناعي", ai_disc: "توصية مدعومة بالبيانات فقط. أي تعديل علاجي قرار الطبيب المعالج.",
+  ai_ok: "المريض مستقر خلال الفترة. الوزن ضمن ±{w} كجم من الأساس، والكاحل صباحاً ضمن المعتاد، والالتزام بالدواء {med}%.",
+  ai_now: "منذ {n} أيام: {r}. سبق ذلك {m} جرعات مدر فائتة و{salty} يوم أكل مالح. يُنصح بمراجعة حالة السوائل لدى المريض.",
+  ai_after: "حدثت انتكاسة احتباس سوائل ({s}–{e}) رُصدت قبل الأعراض بـ {early} أيام بالوزن والكاحل معاً، وسبقتها {m} جرعات مدر فائتة. بعد مراجعة الطبيبة عاد الوزن والكاحل قرب الأساس. نقطة الخلل: الالتزام بالمدر.",
+  ai_hypo: " وسُجّل هبوط سكر ليلي ({v} ملغ/دل) بتاريخ {d} بدون رد من المريض، فتم الاتصال بالأسرة تلقائياً.",
+  ai_wedding: " وتم تجاهل تورّم مسائي بعد مناسبة لأنه زال مع النوم.",
+  sbar: "ملخص التسليم للطبيب الجديد (SBAR)", sbar_s: "الوضع الحالي", sbar_b: "الخلفية", sbar_a: "التقييم", sbar_r: "التوصية",
+  sbar_s0: "مستقر اليوم، لا توجد تنبيهات.", sbar_s1: "تنبيه نشط: {r}.",
+  sbar_b_t: "{age} سنة · {dx} · الأدوية: {meds} · الأساس: {w} كجم، كاحل {a} ملم",
+  sbar_a_t: "الالتزام بالدواء {med}% · انتكاسات احتباس: {ep} · هبوط سكر ليلي: {hypo} · اتصالات تلقائية بالأسرة: {calls} · أيام بلا وزن: {nw}.",
+  sbar_r0: "الاستمرار على الخطة الحالية.", sbar_r1: "مراجعة حالة السوائل لدى المريض.", sbar_r2: "مراجعة أسباب هبوط السكر الليلي.", sbar_r3: "تعزيز الالتزام بالمدر (تذكير الأسرة في المناسبات).",
+  k_med: "الالتزام بالدواء", k_diet: "الالتزام بالغذاء", k_meas: "اكتمال القياسات", k_streams: "التنبيهات حسب النوع", k_fa: "إنذارات كاذبة تم منعها", k_early: "أول تنبيه قبل الأعراض", days: "أيام",
+  ch_weight: "الوزن اليومي (الميزان)", ch_weight_s: "الشريط الأخضر = النطاق الآمن حول الأساس الشخصي · النقاط الملوّنة = تنبيه سريري",
+  ch_ankle: "محيط الكاحل وسوائل الساق (السوار)", ch_ankle_s: "الصباح هو المرجع؛ المساء يرتفع طبيعياً مع الوقوف · الخط المتقطع = سوائل الساق (معاوقة حيوية)",
+  ch_ox: "الأكسجين الليلي ونبض الراحة", ch_ox_s: "الأكسجين ينزل والنبض يرتفع مع احتباس السوائل",
+  ch_act: "النشاط اليومي (خطوات)", ch_act_s: "انخفاض الحركة إشارة داعمة",
+  ch_glu: "السكر من الحساس المستمر", ch_glu_s: "المتوسط اليومي وأقل قراءة ليلية · الخط الأحمر = 70 ملغ/دل",
+  ch_bp: "الضغط الانقباضي", ch_bp_s: "لرصد الهبوط من الأدوية أو الارتفاع",
+  ch_adh: "الالتزام", ch_adh_s: "أحمر = جرعة مدر فائتة، أو يوم بلا وزن، أو أكل مالح",
+  morning: "صباحاً", evening: "مساءً", fluid: "سوائل الساق %", safe: "النطاق الآمن", wrong: "قراءة خاطئة (تم تجاهلها)", mean: "المتوسط", systolic: "الانقباضي",
+  pill_diur: "المدر", pill_weigh: "الوزن", pill_diet: "الغذاء",
+  gap_title: "أين الخلل في الخطة؟", gap_none: "لم تحدث انتكاسة في هذه الفترة. الالتزام جيد والمؤشرات مستقرة.",
+  gap_text: "انتكاسة احتباس سوائل من {s} إلى {e}. قبلها بأسبوع: {m} جرعات مدر فائتة و{salty} يوم أكل مالح. أول تنبيه للمريض قبل الأعراض بـ {early} أيام، والاتصال بالأسرة قبلها بيوم.",
+  g_missed: "جرعات مدر فائتة قبلها", g_peak_w: "أعلى زيادة وزن", g_peak_a: "أعلى زيادة في الكاحل", g_early: "أول تنبيه قبل الأعراض",
+  log_title: "سجل الأحداث والإجراءات", l_date: "التاريخ", l_level: "المستوى", l_what: "ماذا رصد المحرك", l_action: "الإجراء",
+  a_patient_voice: "رسالة صوتية للمريض", a_band_vibrate: "اهتزاز السوار", a_family_message: "رسالة للأسرة", a_call_chain: "📞 اتصال تلقائي", a_doctor_report: "تقرير للطبيبة", a_prompt_997: "زر 997",
+  a_none: "لا تنبيه", a_called: "أكّد: {who}",
+  how1t: "قياس بدون أي مجهود", how1: "ميزان ذكي الصبح، وسوار CardioGuard على الكاحل، وجهاز ضغط، وحساس سكر لمرضى السكري. كل القراءات تنتقل تلقائياً، والتأكيد بالصوت. المريض ما يكتب شيء.",
+  how2t: "أساس شخصي لكل مريض", how2: "أول 14 يوم يتعلم النظام «الطبيعي» الخاص بالمريض نفسه: وزنه، ومحيط كاحله الصباحي، وأكسجينه، ونبضه. وبعدها يقارن كل يوم بالمريض نفسه.",
+  how3t: "ذكاء يربط المؤشرات", how3: "زيادة الوزن مع كاحل أكبر صباحاً أو أكسجين أقل أو حركة أقل = احتمال احتباس سوائل. خوارزمية CUSUM تلقط الزيادة البطيئة، ونموذج Isolation Forest يقيس شذوذ كل المؤشرات معاً، وفلاتر الجودة تمنع الإنذار الكاذب.",
+  how4t: "تصعيد متدرّج حتى الاتصال", how4: "المريض أولاً بصوت ولون واهتزاز، ثم رسالة للأسرة، ثم اتصال تلقائي بالأسرة بالترتيب وتقرير للطبيبة. الطبيب وحده يقرر العلاج.",
+  pay_title: "من يدفع؟ نموذج التمويل",
+  pay1t: "إعارة 90 يوم بعد الخروج", pay1: "الحزمة تُعار في أخطر فترة بعد الخروج من المستشفى، ثم تُعقّم وتنتقل لمريض آخر: الحزمة الواحدة تخدم حتى 4 مرضى في السنة.",
+  pay2t: "برامج الرعاية المزمنة والتأمين", pay2: "دراسة سعودية قدّرت التكلفة الطبية المباشرة لمريض قصور القلب بحوالي 9,563 دولار سنوياً، وأكبر بند فيها التنويم. لذلك الوقاية في البيت هي المكان الأنسب للاستثمار.",
+  pay3t: "أجهزة المريض الحالية", pay3: "الميزان والساعة الموجودة عند المريض تُربط مجاناً عبر Apple Health أو Health Connect، فيبدأ بدون تكلفة أجهزة.",
+  pay4t: "التكامل المستقبلي", pay4: "ربط مع تطبيق صحتي ومستشفى صحة الافتراضي (يقدم متابعة افتراضية لمرضى قصور القلب)، فيصير CardioGuard «الذراع المنزلية» لهم.",
+  safe_title: "السلامة والخصوصية والأنظمة",
+  safe1t: "الطبيب يقرر", safe1: "النظام لا يغيّر أي جرعة ولا يشخّص. يعطي تنبيهاً وتوصية بالمراجعة مع الأدلة.",
+  safe2t: "الخصوصية", safe2: "موافقة المريض، والمريض يحدد من يشوف بياناته، والالتزام بنظام حماية البيانات الشخصية (سدايا) وتخزين البيانات داخل المملكة.",
+  safe3t: "التنظيم", safe3: "البرمجية التي تحلل بيانات المريض لأغراض سريرية تُعد جهازاً طبياً، فتُسجّل لدى هيئة الغذاء والدواء قبل الاستخدام الفعلي.",
+  safe4t: "الصدق في الأرقام", safe4: "كل أرقام النموذج من محاكاة. الخطوة التالية تجربة سريرية صغيرة بموافقة لجنة الأخلاقيات.",
+  footer: "CardioGuard · نموذج أولي · هاكاثون الابتكار الصحي (النسخة السابعة)",
+  months: ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"],
+  wd: ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"],
+  cm_clinical: "تنبيه من كارديو قارد. الوالد صالح عنده علامات احتباس سوائل مستمرة من ثلاثة أيام، وأرسلنا تقريراً لطبيبته. نرجو تطمّن عليه اليوم. للتأكيد اضغط واحد.", cm_glucose: "تنبيه عاجل من كارديو قارد. سكر الوالد صالح نازل، {v} ملغ، وما ردّ على التنبيه الصوتي. نرجو تتصل عليه أو تروح له الآن، وإذا ما استجاب اتصل على تسعة تسعة سبعة. للتأكيد اضغط واحد.", cm_emergency: "حالة طارئة من كارديو قارد. مؤشرات الوالد صالح خطيرة. اتصل على تسعة تسعة سبعة فوراً وروح له. للتأكيد اضغط واحد.",
+  speak_lang: "ar-SA", list_sep: "، ",
+},
+en: {
+  tagline: "Early warning and home follow-up for heart-failure patients",
+  tab_patient: "Patient", tab_band: "Band", tab_family: "Family", tab_doctor: "Doctor report", tab_how: "How it works",
+  day: "Day", of: "of",
+  sc_normal: "Normal day", sc_false: "Scale error", sc_wedding: "Long standing at a wedding", sc_sugar: "Night low sugar", sc_episode: "Fluid build-up", sc_after: "After treatment",
+  sim_note: "Demo: simulated data for a fictional patient based on published patterns. The engine, models and automatic-call logic really run; band thresholds are assumptions that need clinical validation.",
+  patient_name: "Uncle Saleh", patient_short: "Uncle Saleh", physician: "Dr. Sarah Alotaibi",
+  dx: "Chronic heart failure + hypertension + type 2 diabetes", years: "years",
+  contact_khalid: "Khalid (son)", contact_sara: "Sara (daughter)", contact_nurse: "Home nurse",
+  hello: "Good morning,",
+  st0: "All good", st1: "Take care today", st2: "We told Khalid", st3: "Doctor and family informed", st4: "Call emergency now", st_glu: "Your sugar is low",
+  sm0: "Your readings are normal today. Keep following your plan.",
+  sm1: "We noticed a small change in your weight and ankle. Today, follow your doctor's plan for salt, fluids and medicine; we will measure again tomorrow morning.",
+  sm1r: "Your doctor reviewed your case and updated the plan. Your readings are improving.",
+  sm2: "The change has lasted two days. We sent Khalid a summary so he can check on you.",
+  sm3: "We sent your doctor a report and called Khalid to check on you today.",
+  sm4: "Your readings are dangerous. Call 997 now. Your family has been called.",
+  sm_glu: "Your blood sugar is low tonight. Take fast sugar, like half a cup of juice, and check again in 15 minutes.",
+  sm_glu3: "Your sugar is low and you did not answer, so we called Sara and she is coming. Drink half a cup of juice now.",
+  sm_dose: "We could not confirm your water pill. Please take it now and say \"taken\".",
+  sm_dose2: "More than a day without confirming the water pill. We messaged Khalid to remind you.",
+  sm_noweigh: "We did not get your weight today. Just step on the scale; we do the rest. We reminded Khalid.",
+  listen: "🔊 Listen", call997: "📞 997",
+  r_weight: "Weight", r_ankle: "Ankle (morning)", r_spo2: "Night oxygen", r_hr: "Pulse", r_glu: "Glucose", r_bp: "Blood pressure", r_steps: "steps",
+  src_scale: "scale", src_band: "band", src_cgm: "CGM", src_cuff: "BP cuff",
+  usual: "usual", kg: "kg", mm: "mm", per_min: "/min", mgdl: "mg/dL", night_low: "night low",
+  meds: "My medicines today", take: "Taken", taken: "✓ Done", confirmed_voice: "✓ By voice", med_voice: "🎙️ Confirm by voice: say \"taken\"",
+  diet: "My food today", breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner",
+  limits_salt: "Salt: doctor's limit", limits_fluid: "Fluids: doctor's limit", limits_carb: "Carbs: diabetes plan",
+  week_plan: "Weekly meal plan (repeats monthly)", show_week: "Show full week ›", show_no: "Foods to avoid & swaps ›", hide_no: "Hide foods to avoid",
+  diet_disc: "Suggested by the team. Final limits and portions are set by the treating doctor or dietitian for each patient.",
+  share_doc: "📋 Show my report to any doctor", share_title: "Share the report with any doctor", share_text: "The doctor scans the code and opens the full report, even when seeing the patient for the first time.", open_report: "Open report",
+  voice_title: "Voice assistant (phone or home speaker)", voice_sub: "Uncle Saleh types nothing: the system speaks to him in his dialect and listens to his answer. Press 🎙️ and talk (works in Chrome), or use the reply buttons.",
+  v_med: "Uncle Saleh, it is time for your blood-pressure and water pills. Did you take your medicine?", v_med_yes: "Well done, I recorded that you took your medicine.", v_med_no: "OK, I will remind you again in half an hour.",
+  v_alert: "Uncle Saleh, your weight and ankle went up. Do you feel short of breath or swollen?", v_alert_yes: "Take care. We told Khalid and your doctor will follow up.", v_alert_no: "Good. Eat less salt today and follow your doctor's plan; we will measure again tomorrow.",
+  v_weigh: "Good morning Uncle Saleh, please step on the scale for a moment.", v_sugar: "Uncle Saleh, your sugar is low. Drink half a cup of juice now; we will check again in 15 minutes.",
+  v_emerg: "Uncle Saleh, your readings are dangerous. Call 997 now. Your family is on the way.",
+  say_yes: "\"Yes, I took it\"", say_no: "\"No, later\"", say_fine: "\"No, I'm fine\"", say_bad: "\"Yes, short of breath\"",
+  mic: "🎙️ Answer by voice", listening: "Listening…", heard: "Heard:", no_mic: "Speech recognition is not supported in this browser; use the reply buttons.",
+  t_med: "Medicine", t_weigh: "Weigh-in", t_sugar: "Sugar", t_alert: "Alert", t_emerg: "Emergency",
+  hearing_mode: "Option for hearing-impaired patients: screen colours + band vibration instead of voice",
+  legend_title: "Colour & band vibration guide",
+  lg_med: "Medicine time", lg_measure: "Weight or BP measurement", lg_sugar: "Low blood sugar", lg_ok: "Done / all normal", lg_warn: "Attention: readings changed", lg_crit: "Emergency",
+  eng_title: "AI engine: today's decision", risk: "Anomaly score (Isolation Forest)", cusum_l: "Weight trend index (CUSUM)", cusum_h: "alert limit",
+  s_weight: "Weight", s_ankle: "Ankle", s_oxygen: "Oxygen", s_heart: "Pulse", s_activity: "Activity",
+  L1: "1 · Patient", L2: "2 · Family message", L3: "3 · Call + doctor", L4: "🚨 Emergency",
+  why: "Reasons", no_reasons: "No warning signs. All readings are close to the personal baseline.",
+  single_note: "A single signal alone does not trigger escalation.",
+  rs_weight: "Weight {dev} kg above usual", rs_trend: "Steady upward weight trend (CUSUM {c})",
+  rs_ankle: "Morning ankle {mm} mm above usual, leg fluid {bia}%",
+  rs_oxygen: "Night oxygen {v}% (usual {b}%)", rs_heart: "Resting pulse {v} (usual {b})", rs_activity: "Activity {pct}% of weekly average",
+  rs_hypo: "Overnight low glucose {v} mg/dL", rs_dose: "Water pill not confirmed ({n} in 4 days)", rs_noweigh: "No weigh-in today",
+  nt_suspect: "Weight jumped {jump} kg in a day: suspect reading, re-weigh requested, no alert sent",
+  nt_fa_blocked: "Weight back to normal: yesterday was a measurement error and was ignored (false alarm blocked)",
+  nt_no_night: "No night readings from the band (it was charging)", nt_no_weigh: "No weight reading today",
+  nt_evening_swelling: "Evening swelling {mm} mm after {h} hours upright. Usually normal; checked again tomorrow morning before any alert",
+  nt_swelling_resolved: "Yesterday's swelling ({mm} mm) cleared overnight: it came from standing, not fluid retention. No alert sent",
+  nt_band_tight: "Band became tight: the patient was asked to loosen it one notch to protect the skin",
+  nt_reviewed: "Doctor reviewed the case and updated the plan", nt_improving: "Under doctor follow-up: readings improving",
+  nt_salty: "Patient reported salty food", nt_dose_unconfirmed: "Water pill not confirmed today",
+  nt_no_response: "Uncle Saleh did not answer the voice alert within 10 minutes",
+  stream_clinical: "Clinical", stream_glucose: "Glucose", stream_adherence: "Adherence",
+  drag_hint: "Drag to rotate the band", swell_sim: "Try it: simulate ankle swelling",
+  swell_ok: "Within usual range. No alert.", swell_watch: "Small increase: the engine checks it against weight and the morning reading.", swell_sig: "Ankle signal: confirmed with weight before any alert.", swell_tight: "Band is tight: the patient is asked to loosen it.",
+  band_title: "CardioGuard ankle band", band_sub: "Proposed design worn just above the ankle bone, soft medical silicone, water-resistant, wireless charging by the bed.",
+  band_sensors: "What does the band measure?",
+  bs_stretch_t: "Stretch sensor", bs_stretch: "Measures ankle circumference in millimetres. Catches small swelling before it is visible, and warns if the band gets tight.",
+  bs_bia_t: "Bioimpedance", bs_bia: "A very weak, safe current estimates fluid in the leg tissue. Same principle as body-composition scales.",
+  bs_motion_t: "Motion & posture sensor", bs_motion: "Steps, and whether the patient is upright or lying. This separates normal standing swelling from fluid retention.",
+  bs_optical_t: "Optical sensor", bs_optical: "Pulse, and night oxygen as a supporting signal (ankle readings are less accurate than the finger).",
+  bs_vib_t: "Vibration motor", bs_vib: "A different pattern for each alert type, useful for hearing-impaired patients.",
+  live_am: "Ankle (morning)", live_pm: "Ankle (evening)", live_bia: "Leg fluid", live_up: "Upright", live_spo2: "Night oxygen", live_bat: "Battery", hours: "h",
+  band_safety_t: "Safe design for diabetic patients", band_safety: "Diabetic patients may not feel pressure because of nerve damage, so the band is soft and loose, the stretch sensor itself warns if it gets tight, and the app reminds a weekly skin check. Not used with a foot ulcer or severe poor circulation unless the doctor decides.",
+  band_research: "Based on early research: SwellFit (Harvard, 2016), Smart-Sock (Washington State University) and a bioimpedance ankle band (Sensors, 2024). All used small samples; the thresholds here are assumptions that need clinical validation.",
+  fam_hi: "Hello Khalid", fam_status: "Dad's status",
+  fam_s0: "Stable", fam_s1: "Small change, Dad received an alert", fam_s2: "Needs your follow-up today", fam_s3: "Doctor informed, please check on him", fam_s4: "Emergency",
+  fam_week: "Last 7 days", fam_adh: "Medicine adherence this week", fam_feed: "Latest alerts", fam_call: "📞 Call Dad", fam_doc: "Call the clinic",
+  feed_none: "No alerts yet", fa_feed: "A wrong weight reading was ignored (no need to worry)", wedding_feed: "Evening swelling after the wedding cleared overnight (no need to worry)",
+  esc_title: "Escalation levels",
+  fam_why_t: "Family is closer and faster than the hospital. Level 2 is only a message; automatic calls happen only in danger (level 3, emergency, or low sugar with no answer), so the family is not disturbed for every small thing and the doctor is not flooded.",
+  call_title: "Automatic call to the family",
+  call_how: "In danger, the system automatically calls the family in order and reads an Arabic voice message. As soon as someone presses 1 to confirm, calling stops. If nobody confirms, it goes through the list again, then messages everyone.",
+  call_none: "No automatic call on this day. Try the \"Night low sugar\" or \"Fluid build-up\" scenario.",
+  call_trigger: "Why the call", call_order: "Call order",
+  cs_confirmed: "Pressed 1, confirmed", cs_no_answer: "No answer", cs_answered_no_confirm: "Answered, no confirmation", cs_busy: "Busy", cs_failed: "Failed", cs_skip: "Not called",
+  sec: "s", try_call: "▶ Try the call as Khalid receives it", incoming_sub: "Automatic call · health alert", press1: "1", decline: "✕", confirmed_txt: "✓ Confirmed. Thank you.",
+  call_note: "The call is placed by a cloud server (Twilio), so it reaches any phone without an app. The system does not dial 997 itself: it asks the family to call; a direct link with the Red Crescent needs a formal agreement (future work).",
+  doc_title: "Clinical report", p30: "Last 30 days", p90: "Last 90 days", print: "Export PDF",
+  name: "Patient", age: "Age", diagnosis: "Diagnosis", meds_l: "Current medicines", dr: "Treating doctor", base_l: "Personal baseline",
+  ai_summary: "AI summary", ai_disc: "Data-based recommendation only. Any treatment change is the treating doctor's decision.",
+  ai_ok: "The patient is stable in this period. Weight within ±{w} kg of baseline, morning ankle within usual range, medicine adherence {med}%.",
+  ai_now: "For {n} days: {r}. Preceded by {m} missed water-pill doses and {salty} salty-food day(s). Review of the patient's fluid status is recommended.",
+  ai_after: "A fluid build-up episode ({s}–{e}) was detected {early} days before symptoms by weight and ankle together, after {m} missed water-pill doses. After the doctor's review, weight and ankle returned near baseline. Weak point: water-pill adherence.",
+  ai_hypo: " An overnight low glucose ({v} mg/dL) on {d} got no answer from the patient, so the family was called automatically.",
+  ai_wedding: " Evening swelling after a social event was ignored because it cleared overnight.",
+  sbar: "Handover summary for a new doctor (SBAR)", sbar_s: "Situation", sbar_b: "Background", sbar_a: "Assessment", sbar_r: "Recommendation",
+  sbar_s0: "Stable today, no active alerts.", sbar_s1: "Active alert: {r}.",
+  sbar_b_t: "{age} years · {dx} · Medicines: {meds} · Baseline: {w} kg, ankle {a} mm",
+  sbar_a_t: "Medicine adherence {med}% · Fluid episodes: {ep} · Overnight lows: {hypo} · Automatic family calls: {calls} · Days without weight: {nw}.",
+  sbar_r0: "Continue the current plan.", sbar_r1: "Review the patient's fluid status.", sbar_r2: "Review causes of overnight low glucose.", sbar_r3: "Reinforce water-pill adherence (family reminders at gatherings).",
+  k_med: "Medicine adherence", k_diet: "Diet adherence", k_meas: "Complete measurements", k_streams: "Alerts by type", k_fa: "False alarms blocked", k_early: "First alert before symptoms", days: "days",
+  ch_weight: "Daily weight (scale)", ch_weight_s: "Green band = safe range around the personal baseline · coloured dots = clinical alert",
+  ch_ankle: "Ankle circumference and leg fluid (band)", ch_ankle_s: "Morning is the reference; evening rises normally with standing · dashed line = leg fluid (bioimpedance)",
+  ch_ox: "Night oxygen and resting pulse", ch_ox_s: "Oxygen falls and pulse rises with fluid build-up",
+  ch_act: "Daily activity (steps)", ch_act_s: "Lower activity is a supporting signal",
+  ch_glu: "Glucose from the continuous monitor", ch_glu_s: "Daily mean and overnight low · red line = 70 mg/dL",
+  ch_bp: "Systolic blood pressure", ch_bp_s: "To catch drops from medicines, or rises",
+  ch_adh: "Adherence", ch_adh_s: "Red = missed water pill, no weigh-in, or salty food",
+  morning: "Morning", evening: "Evening", fluid: "Leg fluid %", safe: "Safe range", wrong: "Wrong reading (ignored)", mean: "Mean", systolic: "Systolic",
+  pill_diur: "Water pill", pill_weigh: "Weigh-in", pill_diet: "Diet",
+  gap_title: "Where did the plan break down?", gap_none: "No relapse in this period. Adherence is good and readings are stable.",
+  gap_text: "Fluid build-up from {s} to {e}. In the week before: {m} missed water-pill doses and {salty} salty-food day(s). The first patient alert came {early} days before symptoms, and the family call one day before.",
+  g_missed: "Missed water pills before", g_peak_w: "Peak weight gain", g_peak_a: "Peak ankle gain", g_early: "First alert before symptoms",
+  log_title: "Event and action log", l_date: "Date", l_level: "Level", l_what: "What the engine saw", l_action: "Actions",
+  a_patient_voice: "Voice message to patient", a_band_vibrate: "Band vibration", a_family_message: "Family message", a_call_chain: "📞 Automatic call", a_doctor_report: "Report to doctor", a_prompt_997: "997 button",
+  a_none: "No alert", a_called: "Confirmed: {who}",
+  how1t: "Zero-effort measurement", how1: "A smart scale in the morning, the CardioGuard band on the ankle, a BP cuff, and a glucose sensor for diabetics. Readings move automatically and confirmation is by voice. The patient types nothing.",
+  how2t: "Personal baseline", how2: "In the first 14 days the system learns this patient's own normal: weight, morning ankle size, oxygen and pulse. Then every day is compared to the patient himself.",
+  how3t: "AI that links signals", how3: "Weight gain plus a bigger morning ankle, lower oxygen or less activity = likely fluid build-up. CUSUM catches slow gain, an Isolation Forest scores all signals together, and quality filters block false alarms.",
+  how4t: "Step-by-step escalation up to a call", how4: "First the patient by voice, colour and vibration; then a family message; then an automatic call to the family in order and a report to the doctor. Only the doctor decides treatment.",
+  pay_title: "Who pays? Funding model",
+  pay1t: "90-day loan after discharge", pay1: "The kit is lent during the riskiest period after leaving hospital, then cleaned and passed on: one kit can serve up to 4 patients a year.",
+  pay2t: "Chronic-care programmes and insurance", pay2: "A Saudi study estimated the direct medical cost of a heart-failure patient at about US$9,563 a year, mostly hospital stays, so prevention at home is where investment pays off.",
+  pay3t: "The patient's own devices", pay3: "A scale or smartwatch the patient already owns connects for free through Apple Health or Health Connect, so he can start with no device cost.",
+  pay4t: "Future integration", pay4: "Connection with the Sehhaty app and Seha Virtual Hospital (which already runs virtual follow-up for heart-failure patients), so CardioGuard becomes their home arm.",
+  safe_title: "Safety, privacy and regulation",
+  safe1t: "The doctor decides", safe1: "The system never changes a dose or diagnoses. It gives an alert and a review recommendation with the evidence.",
+  safe2t: "Privacy", safe2: "Patient consent, the patient chooses who sees the data, compliance with the Personal Data Protection Law (SDAIA), and data stored in the Kingdom.",
+  safe3t: "Regulation", safe3: "Software that analyses patient data for clinical purposes counts as a medical device, so it is registered with the SFDA before real use.",
+  safe4t: "Honest numbers", safe4: "All prototype numbers come from simulation. The next step is a small clinical pilot approved by an ethics committee.",
+  footer: "CardioGuard · prototype · Health Innovation Hackathon (7th edition)",
+  months: ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
+  wd: ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],
+  cm_clinical: "CardioGuard alert. Your father Saleh has had signs of fluid retention for three days, and we sent his doctor a report. Please check on him today. To confirm, press 1.",
+  cm_glucose: "Urgent CardioGuard alert. Your father Saleh's blood sugar is low, {v} mg, and he did not answer the voice alert. Please call him or go to him now; if he does not respond, call 997. To confirm, press 1.",
+  cm_emergency: "CardioGuard emergency. Your father Saleh's readings are dangerous. Call 997 now and go to him. To confirm, press 1.",
+  speak_lang: "en-US", list_sep: ", ",
+}};
+
+const MED_INFO = {
+  furosemide: {ar: "فوروسيمايد 40 ملغ", en: "Furosemide 40 mg", sub_ar: "مدر للبول", sub_en: "water pill", diuretic: true},
+  bisoprolol: {ar: "بيسوبرولول 5 ملغ", en: "Bisoprolol 5 mg", sub_ar: "ينظم ضربات القلب والضغط", sub_en: "heart rate & BP"},
+  sacubitril_valsartan: {ar: "سكوبيتريل/فالسارتان", en: "Sacubitril/valsartan", sub_ar: "يخفف عبء القلب والضغط", sub_en: "heart load & BP"},
+  empagliflozin: {ar: "إمباغليفلوزين 10 ملغ", en: "Empagliflozin 10 mg", sub_ar: "للسكري ويحمي القلب", sub_en: "diabetes & heart"},
+};
+
+const DIET = { // by weekday, 0 = Sunday · low sodium + counted carbohydrates
+ ar: [
+  ["فول بزيت زيتون بدون ملح + نص رغيف بر","كبسة دجاج بأرز بني (كوب) وبهارات بدل المكعبات","زبادي قليل الدسم + خيار"],
+  ["بيض مسلوق + نص رغيف بر + طماطم","سمك مشوي بالليمون + خضار سوتيه","شوربة عدس منزلية بدون ملح"],
+  ["شوفان بحليب قليل الدسم + مكسرات غير مملحة","مرقوق خضار ولحم قليل الدهن (ملح قليل)","سلطة خضراء بالليمون + حمص منزلي"],
+  ["لبنة قليلة الملح + خيار + نص رغيف بر","دجاج مشوي + نص كوب أرز + سلطة","تفاحة صغيرة + حليب قليل الدسم"],
+  ["فول بالكمون + نص رغيف بر","جريش بالدجاج (ملح قليل، كوب)","زبادي + خيار"],
+  ["أومليت بالخضار","مندي دجاج منزلي بدون مرقة جاهزة (كوب أرز)","شوربة خضار منزلية"],
+  ["شوفان + نص موزة","سمك صيادية منزلي + سلطة","ساندويتش جبن قليل الملح بخبز بر"],
+ ],
+ en: [
+  ["Fava beans with olive oil, no salt + half wholewheat loaf","Chicken kabsa with brown rice (1 cup), spices instead of stock cubes","Low-fat yoghurt + cucumber"],
+  ["Boiled egg + half wholewheat loaf + tomato","Grilled fish with lemon + sautéed vegetables","Home-made lentil soup, no salt"],
+  ["Oats with low-fat milk + unsalted nuts","Vegetable & lean-meat marqooq (little salt)","Green salad with lemon + home-made hummus"],
+  ["Low-salt labneh + cucumber + half wholewheat loaf","Grilled chicken + half cup rice + salad","Small apple + low-fat milk"],
+  ["Fava beans with cumin + half wholewheat loaf","Chicken jareesh (little salt, 1 cup)","Yoghurt + cucumber"],
+  ["Vegetable omelette","Home-made chicken mandi, no ready stock (1 cup rice)","Home-made vegetable soup"],
+  ["Oats + half banana","Home-made fish sayadiyah + salad","Low-salt cheese sandwich on wholewheat bread"],
+ ]};
+
+const AVOID = {
+ ar: [["المخللات","خيار طازج بالليمون"],["الشيبس والمكسرات المملحة","مكسرات غير مملحة"],["مكعبات المرق والشوربات الجاهزة","مرق منزلي بالأعشاب"],["الأجبان المالحة (حلوم، فيتا)","جبن قليل الصوديوم"],["اللحوم المصنعة","دجاج أو لحم طازج"],["المعلبات والصلصات الجاهزة","ليمون، ثوم، كمون، بهارات"],["الوجبات السريعة","وجبة منزلية"],["المشروبات المحلّاة والعصائر المعلبة","ماء أو شاي بدون سكر"],["الحلويات والتمر بكثرة","تمرة وحدة أو فاكهة صغيرة"]],
+ en: [["Pickles","Fresh cucumber with lemon"],["Chips and salted nuts","Unsalted nuts"],["Stock cubes and instant soups","Home-made broth with herbs"],["Salty cheeses (halloumi, feta)","Low-sodium cheese"],["Processed meats","Fresh chicken or meat"],["Canned food and ready sauces","Lemon, garlic, cumin, spices"],["Fast food","Home-cooked meal"],["Sweet drinks and boxed juices","Water or unsweetened tea"],["Sweets and many dates","One date or a small fruit"]],
+};
+
+/* Interactive 3D model of the CardioGuard ankle band (three.js).
+   Swelling is exaggerated x4 on screen so millimetre changes are visible. */
+const Band3D = (() => {
+  let renderer, scene, camera, group, leg, band, line, led, pod, legProfile0, el, raf;
+  let swell = 0, dragging = false, lastX = 0, lastY = 0, rotY = -0.6, rotX = 0.12, idle = 0, ready = false;
+  const SWELL_SCALE = 0.0016 * 4;                       // scene units per mm circumference (exaggerated)
+  const BAND_Y = 0.42, BASE_R = 0.385;
+
+  function legPoints(s) {
+    // [radius, height] from heel to mid-calf; swelling widens the ankle region most
+    const prof = [[0.30, -0.62], [0.42, -0.46], [0.40, -0.25], [0.37, 0.05], [0.37, 0.35], [0.385, 0.55],
+                  [0.43, 0.95], [0.51, 1.45], [0.58, 1.95], [0.60, 2.35], [0.59, 2.7]];
+    return prof.map(([r, y]) => {
+      const w = Math.exp(-Math.pow((y - 0.35) / 0.55, 2));          // swelling weight around the ankle
+      return new THREE.Vector2(r + s * SWELL_SCALE * 6.0 * w, y);
+    });
+  }
+
+  function bandGeometry(r) {
+    // rounded-rectangle cross-section revolved around the leg axis
+    const h = 0.30, t = 0.07, k = 0.03, pts = [];
+    const add = (x, y) => pts.push(new THREE.Vector2(x, y));
+    add(r, -h / 2 + k); add(r + k * 0.3, -h / 2); add(r + t - k * 0.3, -h / 2); add(r + t, -h / 2 + k);
+    add(r + t, h / 2 - k); add(r + t - k * 0.3, h / 2); add(r + k * 0.3, h / 2); add(r, h / 2 - k); add(r, -h / 2 + k);
+    return new THREE.LatheGeometry(pts, 96);
+  }
+
+  function labelTexture() {
+    const c = document.createElement("canvas"); c.width = 512; c.height = 256;
+    const g = c.getContext("2d");
+    g.fillStyle = "#0E1724"; g.fillRect(0, 0, 512, 256);
+    g.fillStyle = "#E5484D";
+    g.beginPath(); g.moveTo(256, 196); g.bezierCurveTo(150, 130, 160, 50, 222, 60); g.bezierCurveTo(240, 64, 252, 76, 256, 88);
+    g.bezierCurveTo(260, 76, 272, 64, 290, 60); g.bezierCurveTo(352, 50, 362, 130, 256, 196); g.fill();
+    g.strokeStyle = "#fff"; g.lineWidth = 9; g.lineJoin = "round"; g.beginPath();
+    g.moveTo(170, 122); g.lineTo(226, 122); g.lineTo(242, 92); g.lineTo(268, 156); g.lineTo(284, 122); g.lineTo(342, 122); g.stroke();
+    g.fillStyle = "#CFE0F0"; g.font = "600 34px IBM Plex Sans, sans-serif"; g.textAlign = "center"; g.fillText("CardioGuard", 256, 238);
+    const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4; return tex;
+  }
+
+  function build() {
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
+    camera.position.set(0, 1.25, 7.8);
+    camera.lookAt(0, 0.85, 0);
+    scene.add(new THREE.HemisphereLight(0xDDE8F5, 0x1A2533, 0.9));
+    const key = new THREE.DirectionalLight(0xffffff, 0.9); key.position.set(3, 4, 5); scene.add(key);
+    const rim = new THREE.DirectionalLight(0x7FB2E5, 0.6); rim.position.set(-4, 2, -3); scene.add(rim);
+
+    group = new THREE.Group(); scene.add(group);
+
+    legProfile0 = legPoints(0);
+    leg = new THREE.Mesh(new THREE.LatheGeometry(legProfile0, 96),
+      new THREE.MeshStandardMaterial({color: 0xC8A089, roughness: 0.75, metalness: 0, transparent: true, opacity: 0.93}));
+    group.add(leg);
+    const foot = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32),
+      new THREE.MeshStandardMaterial({color: 0xC8A089, roughness: 0.75, transparent: true, opacity: 0.93}));
+    foot.scale.set(0.42, 0.24, 1.05); foot.position.set(0, -0.56, 0.62); group.add(foot);
+
+    band = new THREE.Group(); band.position.y = BAND_Y; group.add(band);
+    band.add(new THREE.Mesh(bandGeometry(BASE_R + 0.012),
+      new THREE.MeshStandardMaterial({color: 0x223246, roughness: 0.55, metalness: 0.15})));
+
+    // stretch-sensor trace around the band (colour = tension)
+    line = new THREE.Mesh(new THREE.TorusGeometry(BASE_R + 0.087, 0.011, 12, 160),
+      new THREE.MeshStandardMaterial({color: 0x22A06B, emissive: 0x22A06B, emissiveIntensity: 0.6}));
+    line.rotation.x = Math.PI / 2; band.add(line);
+
+    // bioimpedance electrodes on the inner surface (seen through the skin)
+    for (let i = 0; i < 4; i++) {
+      const a = Math.PI * (0.65 + i * 0.23);
+      const e = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.16, 0.012),
+        new THREE.MeshStandardMaterial({color: 0xD4AF37, metalness: 0.9, roughness: 0.3}));
+      e.position.set(Math.sin(a) * (BASE_R + 0.008), 0, Math.cos(a) * (BASE_R + 0.008)); e.rotation.y = a; band.add(e);
+    }
+
+    // sensor pod on the outer side: optical sensor, motion sensor, battery, vibration motor
+    pod = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.36, 0.13),
+      new THREE.MeshStandardMaterial({color: 0x101C2B, roughness: 0.35, metalness: 0.3}));
+    pod.add(body);
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.22), new THREE.MeshBasicMaterial({map: labelTexture()}));
+    face.position.set(0, 0.02, 0.066); pod.add(face);
+    led = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.03, 0.02),
+      new THREE.MeshStandardMaterial({color: 0x22A06B, emissive: 0x22A06B, emissiveIntensity: 1.2}));
+    led.position.set(0, -0.145, 0.066); pod.add(led);
+    pod.position.set(0, 0, BASE_R + 0.13); band.add(pod);
+
+    renderer = new THREE.WebGLRenderer({antialias: true, alpha: true, preserveDrawingBuffer: true});
+    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    el.appendChild(renderer.domElement);
+    resize();
+    new ResizeObserver(resize).observe(el);
+
+    const c = renderer.domElement;
+    c.addEventListener("pointerdown", e => { dragging = true; lastX = e.clientX; lastY = e.clientY; c.setPointerCapture(e.pointerId); c.style.cursor = "grabbing"; });
+    c.addEventListener("pointermove", e => {
+      if (!dragging) return;
+      rotY += (e.clientX - lastX) * 0.01; rotX = Math.max(-0.5, Math.min(0.6, rotX + (e.clientY - lastY) * 0.006));
+      lastX = e.clientX; lastY = e.clientY; idle = 0;
+    });
+    const up = () => { dragging = false; c.style.cursor = "grab"; };
+    c.addEventListener("pointerup", up); c.addEventListener("pointercancel", up);
+    ready = true;
+    loop();
+  }
+
+  function resize() {
+    if (!renderer) return;
+    const w = el.clientWidth, h = el.clientHeight;
+    renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  }
+
+  function loop() {
+    raf = requestAnimationFrame(loop);
+    if (!dragging && ++idle > 120) rotY += 0.004;
+    group.rotation.y = rotY; group.rotation.x = rotX;
+    renderer.render(scene, camera);
+  }
+
+  function tensionColor(mm) {
+    return mm >= 11 ? 0xE5484D : mm >= 4 ? 0xF07F23 : 0x22A06B;
+  }
+
+  return {
+    init(container) {
+      el = container;
+      if (!window.THREE) { el.insertAdjacentHTML("beforeend", '<div class="fallback">3D model needs an internet connection (three.js).</div>'); return false; }
+      try { build(); return true; } catch (e) { el.insertAdjacentHTML("beforeend", '<div class="fallback">WebGL is not available on this device.</div>'); return false; }
+    },
+    setSwell(mm) {
+      if (!ready) return;
+      swell = mm;
+      leg.geometry.dispose(); leg.geometry = new THREE.LatheGeometry(legPoints(mm), 96);
+      const k = (BASE_R + mm * SWELL_SCALE * 6.0) / BASE_R;
+      band.scale.set(k, 1, k);
+      const col = tensionColor(mm);
+      line.material.color.setHex(col); line.material.emissive.setHex(col);
+    },
+    setAlert(hex) {
+      if (!ready) return;
+      const c = parseInt(hex.replace("#", ""), 16);
+      led.material.color.setHex(c); led.material.emissive.setHex(c);
+    },
+    ready: () => ready,
+  };
+})();
+
+/* CardioGuard web app: patient, band, family, doctor and how-it-works views.
+   Reads the engine output (DATA) and replays it day by day. */
+const DAYS = DATA.days, B = DATA.baseline, EP = DATA.episodes, TH = DATA.thresholds;
+const MEDS = DATA.meds.map(m => Object.assign({id: m.id, time: m.time}, MED_INFO[m.id]));
+const UNIQUE_MEDS = MEDS.filter((m, i, a) => a.findIndex(x => x.id === m.id) === i);
+
+/* ------------------------------------------------------------------ state */
+let lang = "ar", cur = 20, period = 30, playing = null, hearing = false, view = "patient";
+let voiceMode = null, convo = [], listening = false, showAvoid = false, manualSwell = false;
+const takenLocal = {}, answered = {};
+
+/* ---------------------------------------------------------------- helpers */
+const t = k => T[lang][k] ?? k;
+const fmt = (s, p) => s.replace(/\{(\w+)\}/g, (_, k) => p[k] ?? "");
+const num = (v, d = 0) => v == null ? "—" : Number(v).toLocaleString(lang === "ar" ? "ar-SA-u-nu-latn" : "en-US", {minimumFractionDigits: d, maximumFractionDigits: d});
+const sign = (v, d = 1) => (v > 0 ? "+" : "") + Number(v).toFixed(d);
+const dateStr = s => { const [y, m, d] = s.split("-").map(Number); return lang === "ar" ? `${d} ${t("months")[m - 1]} ${y}` : `${t("months")[m - 1]} ${d}, ${y}`; };
+const shortDate = s => { const [, m, d] = s.split("-").map(Number); return lang === "ar" ? `${d} ${t("months")[m - 1]}` : `${t("months")[m - 1]} ${d}`; };
+const weekday = s => new Date(s + "T12:00:00").getDay();
+const LV_COLOR = ["#22A06B", "#F07F23", "#F07F23", "#E5484D", "#B4232A"];
+const SUGAR = "#7B4FD0";
+const $ = id => document.getElementById(id);
+
+const reasonText = ([c, p]) => fmt(t("rs_" + c), {...p, dev: p.dev != null ? sign(p.dev) : "", mm: p.mm != null ? sign(p.mm) : "", bia: p.bia != null ? sign(p.bia) : ""});
+const noteText = ([c, p]) => fmt(t("nt_" + c), {...p, jump: p.jump != null ? sign(p.jump) : ""});
+const visibleReasons = d => d.reasons.filter(r => !(r[0] === "trend" && d.under_review));
+const streamTags = d => (d.streams || []).map(s => `<span class="stag ${s}">${t("stream_" + s)}</span>`).join("");
+const contactName = id => t("contact_" + id);
+const ankleDev = d => d.ankle_am - B.ankle.median;
+const eveningDev = d => d.ankle_pm - B.ankle.median;
+
+function isTaken(day, mi) {
+  if (takenLocal[`${day}-${mi}`]) return true;
+  return MEDS[mi].diuretic ? DAYS[day].diuretic_taken : true;
+}
+const pendingMeds = day => MEDS.map((_, i) => i).filter(i => !isTaken(day, i));
+
+function primaryStream(d) {
+  if (d.level === 4) return "emergency";
+  const s = d.streams || [];
+  return s.includes("clinical") ? "clinical" : s.includes("glucose") ? "glucose" : s.includes("adherence") ? "adherence" : "ok";
+}
+function statusInfo(d) {          // {cls, icon, title, msg} for the patient's phone
+  const p = primaryStream(d);
+  if (p === "emergency") return {cls: "lv4", icon: "🚨", title: t("st4"), msg: t("sm4")};
+  if (p === "glucose") return {cls: "lvg", icon: "🩸", title: t("st_glu"), msg: d.level >= 3 ? t("sm_glu3") : t("sm_glu")};
+  if (p === "clinical") {
+    const msg = d.level >= 3 ? t("sm3") : d.level === 2 ? t("sm2") : d.under_review ? t("sm1r") : t("sm1");
+    return {cls: "lv" + d.level, icon: d.level >= 3 ? "🔴" : "🟠", title: t("st" + d.level), msg};
+  }
+  if (p === "adherence") {
+    if (d.reasons.some(r => r[0] === "noweigh")) return {cls: "lv2", icon: "⚖️", title: t("st2"), msg: t("sm_noweigh")};
+    if (!pendingMeds(cur).length) return {cls: "lv0", icon: "💚", title: t("st0"), msg: t("sm0")};
+    return {cls: "lv" + d.level, icon: "💊", title: d.level >= 2 ? t("st2") : t("st1"), msg: d.level >= 2 ? t("sm_dose2") : t("sm_dose")};
+  }
+  return {cls: "lv0", icon: "💚", title: t("st0"), msg: t("sm0")};
+}
+const alertColor = d => primaryStream(d) === "glucose" ? SUGAR : LV_COLOR[d.level];
+
+/* --------------------------------------------------------------- patient */
+function renderPatient() {
+  const d = DAYS[cur], s = statusInfo(d), wd = weekday(d.date), meals = DIET[lang][wd];
+  const tile = (icon, k, src, v, unit, sub, bad) =>
+    `<div class="tile ${bad ? "bad" : ""}"><div class="k">${icon} ${k}<em>${t(src)}</em></div><div class="v">${v} <small>${unit}</small></div><div class="d">${sub}</div></div>`;
+  const wSub = d.weight == null ? t("nt_no_weigh") : d.suspect ? noteText(d.notes.find(n => n[0] === "suspect")).split(":")[0] : `${sign(d.weight - B.weight.median)} ${t("kg")} · ${t("usual")} ${num(B.weight.median, 1)}`;
+  const meds = MEDS.map((m, i) => {
+    const ok = isTaken(cur, i), byVoice = takenLocal[`${cur}-${i}`] === "voice";
+    return `<div class="med"><div class="n">${m[lang]}<small>${m.time} · ${m["sub_" + lang]}</small></div>${ok ? `<span class="taken">${byVoice ? t("confirmed_voice") : t("taken")}</span>` : `<button class="take" data-take="${i}">${t("take")}</button>`}</div>`;
+  }).join("");
+  $("patientApp").innerHTML = `
+    <div class="hello"><small>${t("wd")[wd]} · ${dateStr(d.date)}</small>${t("hello")} ${t("patient_short")} 👋</div>
+    <div class="status ${s.cls}" id="pStatus">
+      <div class="t">${s.icon} ${s.title}</div>
+      <div class="m">${s.msg}</div>
+      <div class="row"><button class="sbtn" id="speakBtn">${t("listen")}</button>${d.level === 4 ? `<a class="sbtn" href="tel:997">${t("call997")}</a>` : ""}</div>
+    </div>
+    <div class="tiles">
+      ${tile("⚖️", t("r_weight"), "src_scale", d.suspect || d.weight == null ? "—" : num(d.weight, 1), t("kg"), wSub, d.signals.weight || d.weight == null)}
+      ${tile("🦶", t("r_ankle"), "src_band", sign(ankleDev(d)), t("mm"), `${t("usual")} ${num(B.ankle.median)} ${t("mm")}`, d.signals.ankle)}
+      ${tile("🫁", t("r_spo2"), "src_band", num(d.spo2), "%", `${t("usual")} ${num(B.spo2.median)}%`, d.signals.oxygen)}
+      ${tile("❤️", t("r_hr"), "src_band", num(d.rest_hr), "bpm", `👟 ${num(d.steps)} ${t("r_steps")}`, d.signals.heart || d.signals.activity)}
+      ${tile("🩸", t("r_glu"), "src_cgm", num(d.glu_mean), t("mgdl"), `${t("night_low")} ${num(d.glu_night_min)}`, d.glu_night_min < TH.glucose_low)}
+      ${tile("🩺", t("r_bp"), "src_cuff", `${d.sbp}/${d.dbp}`, "mmHg", "", d.sbp < TH.sbp_low)}
+    </div>
+    <div class="sect"><h4>💊 ${t("meds")}</h4><div class="muted" style="font-size:13px;margin-bottom:4px">${t("med_voice")}</div>${meds}</div>
+    <div class="sect"><h4>🥗 ${t("diet")}</h4>
+      <div class="meal"><b>${t("breakfast")}</b><span>${meals[0]}</span></div>
+      <div class="meal"><b>${t("lunch")}</b><span>${meals[1]}</span></div>
+      <div class="meal"><b>${t("dinner")}</b><span>${meals[2]}</span></div>
+      <div class="limits"><span>🧂 ${t("limits_salt")}</span><span>💧 ${t("limits_fluid")}</span><span>🍞 ${t("limits_carb")}</span></div>
+      <div><button class="linkbtn" id="weekBtn">${t("show_week")}</button></div>
+      <div><button class="linkbtn" id="avoidBtn">${showAvoid ? t("hide_no") : t("show_no")}</button></div>
+      ${showAvoid ? `<div class="no">${AVOID[lang].map(([a, b]) => `<div><span>🚫 ${a}</span><span>${b}</span></div>`).join("")}</div>` : ""}
+    </div>
+    <button class="call" id="shareBtn">${t("share_doc")}</button>`;
+  $("speakBtn").onclick = () => speak(s.msg);
+  $("weekBtn").onclick = openDiet;
+  $("shareBtn").onclick = openShare;
+  $("avoidBtn").onclick = () => { showAvoid = !showAvoid; renderPatient(); };
+  document.querySelectorAll("[data-take]").forEach(b => b.onclick = () => { takenLocal[`${cur}-${b.dataset.take}`] = "tap"; buzz([60]); renderPatient(); renderVoice(); });
+}
+
+/* --------------------------------------------------- voice assistant + alerts */
+const ALERTS = {
+  med:   {color: "#E9A800", ic: "💊", vib: [400, 200, 400], pattern: "▮ ▮", q: "v_med", yes: "say_yes", no: "say_no",
+          onYes() { MEDS.forEach((_, i) => takenLocal[`${cur}-${i}`] = takenLocal[`${cur}-${i}`] || "voice"); return "v_med_yes"; }, onNo: () => "v_med_no"},
+  weigh: {color: "#2F80ED", ic: "⚖️", vib: [900], pattern: "▮▮▮", q: "v_weigh"},
+  sugar: {color: SUGAR, ic: "🩸", vib: [200, 100, 200, 100, 200, 100, 200], pattern: "▮▮▮▮", q: "v_sugar"},
+  alert: {color: "#F07F23", ic: "⚠️", vib: [300, 150, 300, 150, 300], pattern: "▮ ▮ ▮", q: "v_alert", yes: "say_bad", no: "say_fine",
+          onYes() { answered[cur] = "y"; return "v_alert_yes"; }, onNo() { answered[cur] = "n"; return "v_alert_no"; }},
+  emerg: {color: "#E5484D", ic: "🚨", vib: [1000, 200, 1000, 200, 1000], pattern: "▮▮▮▮▮…", q: "v_emerg"},
+};
+function autoMode(d) {
+  const p = primaryStream(d);
+  if (p === "emergency") return "emerg";
+  if (p === "glucose") return "sugar";
+  if (p === "clinical") return "alert";
+  if (d.weight == null) return "weigh";
+  if (pendingMeds(cur).length) return "med";
+  return null;
+}
+function renderVoiceTriggers() {
+  const keys = [["med", "t_med"], ["weigh", "t_weigh"], ["sugar", "t_sugar"], ["alert", "t_alert"], ["emerg", "t_emerg"]];
+  $("vtrig").innerHTML = keys.map(([k, l]) => `<button class="vt" data-v="${k}"><span class="dot" style="background:${ALERTS[k].color}"></span>${ALERTS[k].ic} ${t(l)}</button>`).join("");
+  document.querySelectorAll("#vtrig [data-v]").forEach(b => b.onclick = () => fire(b.dataset.v));
+  $("legend").innerHTML = [["med", "lg_med"], ["weigh", "lg_measure"], ["sugar", "lg_sugar"], ["alert", "lg_warn"], ["emerg", "lg_crit"]]
+    .map(([k, l]) => `<div><span class="dot" style="background:${ALERTS[k].color}"></span><span>${ALERTS[k].ic} ${t(l)}</span><em>${ALERTS[k].pattern}</em></div>`).join("")
+    + `<div><span class="dot" style="background:#22A06B"></span><span>✅ ${t("lg_ok")}</span><em>▮</em></div>`;
+}
+function fire(mode) {
+  voiceMode = mode;
+  const a = ALERTS[mode];
+  convo = [{who: "sys", text: t(a.q)}];
+  buzz(a.vib);
+  if (!hearing) speak(t(a.q));
+  const st = $("pStatus"); if (st) { st.classList.remove("flash"); void st.offsetWidth; st.classList.add("flash"); }
+  renderVoice();
+}
+function renderVoice() {
+  const mode = voiceMode || autoMode(DAYS[cur]);
+  const fb = $("flashbar");
+  fb.style.background = mode ? ALERTS[mode].color : "#22A06B";
+  fb.classList.toggle("on", hearing && !!mode);
+  const box = $("voice");
+  if (!mode) { box.innerHTML = `<div class="bub sys">✅ ${t("st0")}</div>`; return; }
+  const a = ALERTS[mode];
+  if (!convo.length) convo = [{who: "sys", text: t(a.q)}];
+  const canReply = a.yes && convo.length === 1;
+  box.innerHTML = convo.map(b => `<div class="bub ${b.who}">${b.text}</div>`).join("") +
+    (canReply ? `<div class="vrow"><button class="mic ${listening ? "on" : ""}" id="micBtn">${listening ? t("listening") : t("mic")}</button><button data-say="yes">${t(a.yes)}</button><button data-say="no">${t(a.no)}</button></div>` : "");
+  const mb = $("micBtn"); if (mb) mb.onclick = () => listen(mode);
+  box.querySelectorAll("[data-say]").forEach(b => b.onclick = () => reply(mode, b.dataset.say === "yes", t(a[b.dataset.say]).replace(/[«»"]/g, "")));
+}
+const YES = /(أخذت|اخذت|خذيت|إيه|ايه|ايوه|أيوه|نعم|تم|أحس|احس|ضيق|yes|took|yeah|done|short)/i;
+function reply(mode, yes, heard) {
+  const a = ALERTS[mode];
+  convo.push({who: "me", text: heard});
+  const ans = t(yes ? a.onYes() : a.onNo());
+  convo.push({who: "sys", text: ans});
+  speak(ans); buzz([80]);
+  renderVoice(); renderPatient();
+}
+function listen(mode) {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { convo.push({who: "sys", text: t("no_mic")}); renderVoice(); return; }
+  const r = new SR(); r.lang = t("speak_lang"); r.interimResults = false; r.maxAlternatives = 3;
+  listening = true; renderVoice();
+  r.onresult = e => {
+    listening = false;
+    const said = [...e.results[0]].map(x => x.transcript).join(" ");
+    const isNo = /^\s*(لا|no)\b/i.test(e.results[0][0].transcript);
+    reply(mode, !isNo && YES.test(said), `${t("heard")} «${e.results[0][0].transcript}»`);
+  };
+  r.onerror = r.onend = () => { if (listening) { listening = false; renderVoice(); } };
+  try { r.start(); } catch (e) { listening = false; renderVoice(); }
+}
+function buzz(p) { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} }
+function speak(text) {
+  try {
+    const s = window.speechSynthesis; if (!s || hearing) return;
+    s.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = t("speak_lang"); u.rate = .92;
+    const v = s.getVoices().find(v => v.lang && v.lang.toLowerCase().startsWith(lang)); if (v) u.voice = v;
+    s.speak(u);
+  } catch (e) {}
+}
+
+/* ----------------------------------------------------------------- engine */
+function renderEngine() {
+  const d = DAYS[cur];
+  const sigs = ["weight", "ankle", "oxygen", "heart", "activity"];
+  const lvOn = i => i < 4 ? (d.level >= i && d.level < 4) : d.level === 4;
+  const rs = visibleReasons(d);
+  const reasons = rs.length ? `<ul class="reasons">${rs.map(r => `<li>${reasonText(r)}</li>`).join("")}</ul>` : `<div class="muted" style="font-size:14px">${t("no_reasons")}</div>`;
+  const single = (d.signals.weight || d.signals.ankle) && !d.congestion && !(d.streams || []).length ? `<div class="note">${t("single_note")}</div>` : "";
+  const good = ["fa_blocked", "swelling_resolved"], warn = ["band_tight", "no_response", "suspect"];
+  const notes = d.notes.map(n => `<div class="note ${good.includes(n[0]) ? "good" : warn.includes(n[0]) ? "warn" : ""}">${noteText(n)}</div>`).join("");
+  const riskColor = d.risk >= 70 ? "var(--crit)" : d.risk >= 40 ? "var(--warn)" : "var(--ok)";
+  const cus = Math.min(100, d.cusum / (TH.cusum_h * 2) * 100);
+  $("engine").innerHTML = `
+    <h3 style="margin:0">🧠 ${t("eng_title")} ${streamTags(d)}</h3>
+    <div class="sig">${sigs.map(s => `<div class="${d.signals[s] ? "on" : ""}"><b>${d.signals[s] ? "▲" : "•"}</b>${t("s_" + s)}</div>`).join("")}</div>
+    <div><div style="display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:6px"><span>${t("risk")}</span><b>${d.risk}/100</b></div><div class="meter"><i style="width:${d.risk}%;background:${riskColor}"></i></div></div>
+    <div><div style="display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:6px"><span>${t("cusum_l")}</span><b>${num(d.cusum, 1)} <small class="muted">/ ${t("cusum_h")} ${TH.cusum_h}</small></b></div><div class="meter"><i style="width:${cus}%;background:${d.cusum >= TH.cusum_h ? "var(--warn)" : "var(--measure)"}"></i><span style="position:absolute;inset-inline-start:50%;top:0;bottom:0;width:2px;background:var(--ink)"></span></div></div>
+    <div class="ladder">${[1, 2, 3, 4].map(i => `<div class="${lvOn(i) ? "on" : ""}" style="${lvOn(i) ? `background:${i === 4 ? LV_COLOR[4] : alertColor(d)}` : ""}">${t("L" + i)}</div>`).join("")}</div>
+    <div><b style="font-size:14px">${t("why")}</b>${reasons}</div>${single}${notes}`;
+}
+
+/* ------------------------------------------------------------------- band */
+let bandInit = false;
+function swellNote(mm) {
+  return mm >= TH.band_tight ? t("swell_tight") : mm >= TH.ankle_gain ? t("swell_sig") : mm >= 2 ? t("swell_watch") : t("swell_ok");
+}
+function setSwellUI(mm) {
+  $("swell").value = mm;
+  $("swellVal").textContent = `${sign(mm)} ${t("mm")}`;
+  $("swellNote").textContent = swellNote(mm);
+  Band3D.setSwell(mm);
+}
+function renderBand() {
+  const d = DAYS[cur];
+  if (!bandInit) { bandInit = Band3D.init($("stage")); }
+  if (!manualSwell) setSwellUI(Math.max(0, Math.min(14, Math.round(ankleDev(d) * 2) / 2)));
+  Band3D.setAlert(d.level ? alertColor(d) : "#22A06B");
+  $("hudState").textContent = `${t("day")} ${cur + 1} · ${shortDate(d.date)}`;
+  const bat = 100 - (cur % 6) * 14;
+  const tight = d.notes.some(n => n[0] === "band_tight");
+  const cells = [
+    [t("live_am"), `${num(d.ankle_am, 1)} <small>${t("mm")} (${sign(ankleDev(d))})</small>`, d.signals.ankle],
+    [t("live_pm"), `${num(d.ankle_pm, 1)} <small>${t("mm")} (${sign(eveningDev(d))})</small>`, tight],
+    [t("live_bia"), `${sign(d.bia)}<small>%</small>`, d.bia <= -TH.bia_drop],
+    [t("live_up"), `${num(d.upright_h, 1)} <small>${t("hours")}</small>`, false],
+    [t("live_spo2"), d.spo2 == null ? "—" : `${num(d.spo2)}<small>%</small>`, d.signals.oxygen],
+    [t("live_bat"), `${bat}<small>%</small>`, bat < 30],
+  ];
+  $("bandLive").innerHTML = cells.map(([k, v, bad]) => `<div class="${bad ? "bad" : ""}"><small>${k}</small><b>${v}</b></div>`).join("") +
+    d.notes.filter(n => ["evening_swelling", "swelling_resolved", "band_tight", "no_night"].includes(n[0]))
+      .map(n => `<div style="grid-column:1/-1" class="${n[0] === "swelling_resolved" ? "" : ""}"><small>${noteText(n)}</small></div>`).join("");
+  $("sensors").innerHTML = [["📏", "stretch"], ["⚡", "bia"], ["🧭", "motion"], ["💡", "optical"], ["📳", "vib"]]
+    .map(([ic, k]) => `<div class="sensor"><div class="ic">${ic}</div><div><b>${t("bs_" + k + "_t")}</b><span>${t("bs_" + k)}</span></div></div>`).join("");
+}
+
+/* ----------------------------------------------------------------- family */
+function famFeed() {
+  const items = [];
+  for (let i = cur; i >= Math.max(0, cur - 30) && items.length < 7; i--) {
+    const d = DAYS[i];
+    if (d.calls) items.push({d, col: alertColor(d), txt: `📞 ${t("a_call_chain")} · ${fmt(t("a_called"), {who: contactName(d.calls.by)})}`});
+    if (d.notes.some(n => n[0] === "swelling_resolved")) items.push({d, col: "#22A06B", txt: t("wedding_feed")});
+    else if (d.false_alarm_blocked) items.push({d, col: "#22A06B", txt: t("fa_feed")});
+    else if (d.level >= 1) items.push({d, col: alertColor(d), txt: streamTags(d) + visibleReasons(d).map(reasonText).join(" · ")});
+  }
+  return items.length ? items.slice(0, 7).map(x => `<div class="fi"><span class="bar" style="background:${x.col}"></span><div><small>${shortDate(x.d.date)}</small>${x.txt}</div></div>`).join("") : `<div class="muted">${t("feed_none")}</div>`;
+}
+function renderFamily() {
+  const d = DAYS[cur], lv = d.level;
+  const week = DAYS.slice(Math.max(0, cur - 6), cur + 1);
+  const due = week.reduce((a, x) => a + x.doses_due, 0), took = week.reduce((a, x) => a + x.doses_taken, 0);
+  const adh = Math.round(took / due * 100), rs = visibleReasons(d);
+  const glu = primaryStream(d) === "glucose";
+  $("familyApp").innerHTML = `
+    <div class="hello"><small>${dateStr(d.date)}</small>${t("fam_hi")} 👋</div>
+    <div class="status ${glu ? "lvg" : "lv" + lv}">
+      <div class="t">${t("fam_status")}: ${glu ? t("st_glu") : t("fam_s" + lv)}</div>
+      <div class="m">${rs.length ? rs.map(reasonText).join("<br>") : t("no_reasons")}</div>
+    </div>
+    <div class="callrow"><a class="call" href="tel:${DATA.contacts[0].phone}">${t("fam_call")}</a><a class="call alt" href="tel:+966110000000">${t("fam_doc")}</a></div>
+    <div class="sect"><h4>📅 ${t("fam_week")}</h4><div class="week">${week.map(x => `<div><i style="background:${x.level ? alertColor(x) : "#22A06B33"}"></i>${shortDate(x.date).split(" ")[lang === "ar" ? 0 : 1]}</div>`).join("")}</div></div>
+    <div class="sect"><h4>💊 ${t("fam_adh")}</h4><div style="display:flex;align-items:center;gap:10px"><div class="meter" style="flex:1"><i style="width:${adh}%;background:${adh >= 90 ? "var(--ok)" : "var(--warn)"}"></i></div><b>${adh}%</b></div></div>
+    <div class="sect"><h4>🔔 ${t("fam_feed")}</h4><div class="feed">${famFeed()}</div></div>`;
+  $("famLadder").innerHTML = [1, 2, 3, 4].map(i => { const on = i < 4 ? lv >= i && lv < 4 : lv === 4; return `<div class="${on ? "on" : ""}" style="${on ? `background:${i === 4 ? LV_COLOR[4] : alertColor(d)};color:#fff` : ""}">${t("L" + i)}</div>`; }).join("");
+  renderCallBox();
+}
+function callMessage(stream, v) {
+  return fmt(t("cm_" + stream), {v: v ?? ""});
+}
+function renderCallBox() {
+  const d = DAYS[cur], c = d.calls;
+  const head = `<p class="muted" style="margin:0 0 12px;font-size:14px;line-height:1.75">${t("call_how")}</p>`;
+  let body;
+  if (c) {
+    const reached = {};
+    c.log.forEach(l => { if (!(l.contact in reached)) reached[l.contact] = l; });
+    const hypo = d.reasons.find(r => r[0] === "hypo");
+    const why = d.streams.includes("glucose") ? `${reasonText(hypo)} · ${t("nt_no_response")}` : visibleReasons(d).slice(0, 3).map(reasonText).join(t("list_sep"));
+    body = `<div class="trigger"><b>${t("call_trigger")}:</b> ${why}</div>
+      <b style="font-size:14px">${t("call_order")}</b>
+      <div class="chain">${DATA.contacts.map((ct, i) => {
+        const l = reached[ct.name];
+        const st = l ? l.status : "skip";
+        const cls = st === "confirmed" ? "ok" : st === "skip" ? "wait" : "miss";
+        return `<div class="cstep ${cls}"><span class="n">${i + 1}</span><div><b>${contactName(ct.name)}</b><small dir="ltr" style="text-align:${lang === "ar" ? "right" : "left"}">${ct.phone.replace(/(\+966)(\d{2})(\d{3})(\d{4})/, "$1 $2 $3 $4")}</small></div><span class="pill ${st === "confirmed" ? "ok" : "miss"}">${t("cs_" + st)}${l ? ` · ${l.seconds}${t("sec")}` : ""}</span></div>`;
+      }).join("")}</div>`;
+  } else {
+    body = `<div class="note" style="margin-bottom:12px">${t("call_none")}</div>
+      <b style="font-size:14px">${t("call_order")}</b>
+      <div class="chain">${DATA.contacts.map((ct, i) => `<div class="cstep wait"><span class="n">${i + 1}</span><div><b>${contactName(ct.name)}</b></div><span></span></div>`).join("")}</div>`;
+  }
+  $("callBox").innerHTML = head + body + `<button class="call" id="tryCall" style="margin-top:14px;width:100%">${t("try_call")}</button><p class="muted" style="margin:12px 0 0;font-size:12.5px;line-height:1.7">${t("call_note")}</p>`;
+  $("tryCall").onclick = ringIncoming;
+}
+function ringIncoming() {
+  const d = DAYS[cur];
+  const stream = d.calls ? (d.streams.includes("glucose") ? "glucose" : d.level === 4 ? "emergency" : "clinical") : "glucose";
+  const hypo = d.reasons.find(r => r[0] === "hypo");
+  const msg = callMessage(stream, hypo ? hypo[1].v : 52);
+  const box = $("incoming");
+  box.innerHTML = `<div><div class="ringa">📞</div><div class="who">CardioGuard</div><div class="sub">${t("incoming_sub")}</div></div>
+    <div class="msg">${msg}</div>
+    <div class="keys"><button class="k" id="decl" style="background:#5B6B80">${t("decline")}</button><button class="k" id="press1" style="background:#22A06B">${t("press1")}</button></div>`;
+  box.classList.add("on");
+  buzz([600, 300, 600, 300, 600]);
+  speak(msg);
+  $("decl").onclick = () => { speechSynthesis && speechSynthesis.cancel(); box.classList.remove("on"); };
+  $("press1").onclick = () => {
+    speechSynthesis && speechSynthesis.cancel();
+    box.querySelector(".keys").outerHTML = `<div class="done">${t("confirmed_txt")}</div>`;
+    speak(t("confirmed_txt").replace("✓", ""));
+    setTimeout(() => box.classList.remove("on"), 2600);
+  };
+}
+
+/* ----------------------------------------------------------------- doctor */
+const windowDays = () => DAYS.slice(Math.max(0, cur - period + 1), cur + 1);
+function episodeIn(win) {
+  const a = win[0].day, b = win[win.length - 1].day;
+  return EP.find(e => e.start <= b && e.end >= a && e.first_alert <= b);
+}
+function medAdh(win) { const due = win.reduce((a, x) => a + x.doses_due, 0), took = win.reduce((a, x) => a + x.doses_taken, 0); return Math.round(took / due * 100); }
+function aiSummary(win) {
+  const d = DAYS[cur], e = episodeIn(win), sep = t("list_sep");
+  const hypo = win.filter(x => x.glu_night_min < TH.glucose_low).pop();
+  const wed = win.some(x => x.notes.some(n => n[0] === "swelling_resolved"));
+  const extra = (hypo ? fmt(t("ai_hypo"), {v: hypo.glu_night_min, d: shortDate(hypo.date)}) : "") + (wed ? t("ai_wedding") : "");
+  if (e && cur > e.end) return fmt(t("ai_after"), {s: shortDate(DAYS[e.start].date), e: shortDate(DAYS[e.end].date), early: e.symptoms_day - e.first_alert, m: e.missed_diuretic}) + extra;
+  if (e) {
+    let n = 0; for (let i = cur; i >= 0 && DAYS[i].congestion; i--) n++;
+    const w = DAYS.slice(Math.max(0, e.start - 7), cur + 1);
+    return fmt(t("ai_now"), {n: Math.max(n, 1), r: visibleReasons(d).map(reasonText).join(sep) || t("nt_improving"), m: w.filter(x => !x.diuretic_taken).length, salty: w.filter(x => !x.diet_ok).length}) + extra;
+  }
+  const valid = win.filter(x => !x.suspect && x.weight != null).map(x => Math.abs(x.weight - B.weight.median));
+  return fmt(t("ai_ok"), {w: num(Math.max(...valid), 1), med: medAdh(win)}) + extra;
+}
+function renderSBAR(win) {
+  const d = DAYS[cur], e = episodeIn(win);
+  const hypos = win.filter(x => x.glu_night_min < TH.glucose_low).length, nw = win.filter(x => x.weight == null).length;
+  const calls = win.filter(x => x.calls).length, rs = visibleReasons(d), sep = t("list_sep");
+  const recs = [];
+  if (d.congestion && !d.under_review) recs.push(t("sbar_r1"));
+  if (hypos) recs.push(t("sbar_r2"));
+  if (e || win.filter(x => !x.diuretic_taken).length >= 2) recs.push(t("sbar_r3"));
+  if (!recs.length) recs.push(t("sbar_r0"));
+  const items = [
+    ["S", t("sbar_s"), d.level ? fmt(t("sbar_s1"), {r: rs.map(reasonText).join(sep)}) : t("sbar_s0")],
+    ["B", t("sbar_b"), fmt(t("sbar_b_t"), {age: DATA.patient.age, dx: t("dx"), meds: UNIQUE_MEDS.map(m => m[lang]).join(sep), w: num(B.weight.median, 1), a: num(B.ankle.median)})],
+    ["A", t("sbar_a"), fmt(t("sbar_a_t"), {med: medAdh(win), ep: e ? 1 : 0, hypo: hypos, calls, nw})],
+    ["R", t("sbar_r"), recs.join("<br>")],
+  ];
+  $("sbarBox").innerHTML = items.map(([k, l, v]) => `<div><b><i>${k}</i>${l}</b>${v}</div>`).join("");
+}
+function renderDoctor() {
+  const win = windowDays(), d = DAYS[cur], e = episodeIn(win);
+  $("pinfo").innerHTML = [
+    [t("name"), `${t("patient_name")} · ${DATA.patient.id}`], [t("age"), `${DATA.patient.age} ${t("years")}`], [t("diagnosis"), t("dx")],
+    [t("meds_l"), UNIQUE_MEDS.map(m => m[lang]).join(" · ")], [t("dr"), t("physician")],
+    [t("base_l"), `${num(B.weight.median, 1)} ${t("kg")} · ${num(B.ankle.median)} ${t("mm")} · SpO₂ ${num(B.spo2.median)}%`],
+  ].map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join("");
+  $("aiText").textContent = aiSummary(win);
+  renderSBAR(win);
+  const diet = Math.round(win.filter(x => x.diet_ok).length / win.length * 100);
+  const meas = Math.round(win.filter(x => x.weight != null && x.spo2 != null && !x.suspect).length / win.length * 100);
+  const cnt = s => win.filter(x => (x.streams || []).includes(s)).length;
+  const fa = win.filter(x => x.false_alarm_blocked).length;
+  $("kpis").innerHTML = [
+    [t("k_med"), `${medAdh(win)}<small>%</small>`], [t("k_diet"), `${diet}<small>%</small>`], [t("k_meas"), `${meas}<small>%</small>`],
+    [t("k_streams"), `<span style="font-size:15px;line-height:1.9;display:block">${["clinical", "glucose", "adherence"].map(s => `<span class="stag ${s}">${t("stream_" + s)} ${cnt(s)}</span>`).join(" ")}</span>`],
+    [t("k_fa"), fa], [t("k_early"), e && cur >= e.symptoms_day ? `${e.symptoms_day - e.first_alert} <small>${t("days")}</small>` : "—"],
+  ].map(([k, v]) => `<div class="kpi"><small>${k}</small><b>${v}</b></div>`).join("");
+  drawCharts(win);
+  const g = $("gapBox");
+  if (e && cur >= e.first_alert) {
+    g.innerHTML = `<p style="margin:0 0 12px;line-height:1.75">${fmt(t("gap_text"), {s: shortDate(DAYS[e.start].date), e: shortDate(DAYS[Math.min(e.end, cur)].date), m: e.missed_diuretic, salty: e.salty_days, early: e.symptoms_day - e.first_alert})}</p>
+      <div class="gap"><div><small>${t("g_missed")}</small><b>${e.missed_diuretic}</b></div><div><small>${t("g_peak_w")}</small><b>+${e.peak_weight_gain} ${t("kg")}</b></div><div><small>${t("g_peak_a")}</small><b>+${e.peak_ankle_gain} ${t("mm")}</b></div><div><small>${t("g_early")}</small><b>${e.symptoms_day - e.first_alert} ${t("days")}</b></div></div>`;
+  } else g.innerHTML = `<p class="muted" style="margin:0">${t("gap_none")}</p>`;
+  const rows = win.filter(x => x.level || x.false_alarm_blocked || x.suspect || x.reviewed || x.notes.some(n => n[0] === "evening_swelling")).reverse();
+  const acts = x => {
+    if (!x.actions.length) return x.reviewed ? t("nt_reviewed") : t("a_none");
+    return x.actions.map(a => t("a_" + a)).join("<br>") + (x.calls ? `<br><b>${fmt(t("a_called"), {who: contactName(x.calls.by)})}</b>` : "");
+  };
+  $("logTbl").innerHTML = `<tr><th>${t("l_date")}</th><th>${t("l_level")}</th><th>${t("l_what")}</th><th>${t("l_action")}</th></tr>` +
+    (rows.length ? rows.map(x => `<tr><td style="white-space:nowrap">${shortDate(x.date)}</td><td><span class="lvtag" style="background:${x.level ? alertColor(x) : LV_COLOR[0]}">${x.level ? t("L" + x.level) : "—"}</span><div style="margin-top:4px">${streamTags(x)}</div></td><td>${[...visibleReasons(x).map(reasonText), ...x.notes.map(noteText)].join("<br>")}</td><td>${acts(x)}</td></tr>`).join("")
+      : `<tr><td colspan="4" class="muted">${t("feed_none")}</td></tr>`);
+}
+
+const PL = {displayModeBar: false, responsive: true};
+function layout(extra) {
+  return Object.assign({
+    margin: {l: 46, r: 46, t: 10, b: 34}, paper_bgcolor: "#fff", plot_bgcolor: "#fff",
+    font: {family: "IBM Plex Sans Arabic, IBM Plex Sans, sans-serif", size: 12, color: "#4A5A70"},
+    xaxis: {gridcolor: "#EEF1F6", type: "date", tickformat: "%d/%m"}, yaxis: {gridcolor: "#EEF1F6", zeroline: false},
+    showlegend: true, legend: {orientation: "h", y: 1.14, x: 0, font: {size: 11}}, hovermode: "x unified",
+  }, extra);
+}
+function shapes(extra = []) {
+  const s = [];
+  EP.forEach(e => { if (e.first_alert <= cur) s.push({type: "rect", xref: "x", yref: "paper", x0: DAYS[e.start].date, x1: DAYS[Math.min(e.end, cur)].date, y0: 0, y1: 1, fillcolor: "rgba(240,127,35,.10)", line: {width: 0}, layer: "below"}); });
+  s.push({type: "line", xref: "x", yref: "paper", x0: DAYS[cur].date, x1: DAYS[cur].date, y0: 0, y1: 1, line: {color: "#0B3C5D", width: 1, dash: "dot"}});
+  return s.concat(extra);
+}
+function drawCharts(win) {
+  if (!window.Plotly) return;
+  const x = win.map(d => d.date), sh = shapes();
+  const bw = B.weight.median, tw = TH.weight_gain;
+  const valid = win.filter(d => !d.suspect && d.weight != null), sus = win.filter(d => d.suspect);
+  const clin = d => (d.streams || []).includes("clinical");
+  Plotly.react("chW", [
+    {x: [x[0], x[x.length - 1], x[x.length - 1], x[0]], y: [bw - tw, bw - tw, bw + tw, bw + tw], fill: "toself", mode: "lines", fillcolor: "rgba(34,160,107,.10)", line: {width: 0}, hoverinfo: "skip", name: t("safe")},
+    {x: valid.map(d => d.date), y: valid.map(d => d.weight), mode: "lines+markers", name: t("r_weight"), line: {color: "#0B3C5D", width: 2}, marker: {size: valid.map(d => clin(d) ? 9 : 5), color: valid.map(d => clin(d) ? LV_COLOR[d.level] : "#0B3C5D")}},
+    {x: sus.map(d => d.date), y: sus.map(d => d.weight), mode: "markers", name: t("wrong"), marker: {symbol: "x", size: 11, color: "#8593A6"}},
+  ], layout({shapes: sh, yaxis: {gridcolor: "#EEF1F6", title: {text: t("kg"), font: {size: 11}}}}), PL);
+  const ba = B.ankle.median;
+  Plotly.react("chK", [
+    {x: [x[0], x[x.length - 1], x[x.length - 1], x[0]], y: [ba - 2, ba - 2, ba + TH.ankle_gain, ba + TH.ankle_gain], fill: "toself", mode: "lines", fillcolor: "rgba(34,160,107,.10)", line: {width: 0}, hoverinfo: "skip", name: t("safe")},
+    {x, y: win.map(d => d.ankle_am), name: t("morning"), mode: "lines+markers", line: {color: "#0B3C5D", width: 2}, marker: {size: win.map(d => d.signals.ankle ? 9 : 4), color: win.map(d => d.signals.ankle ? "#F07F23" : "#0B3C5D")}},
+    {x, y: win.map(d => d.ankle_pm), name: t("evening"), mode: "lines", line: {color: "#9DB7D3", width: 1.5}},
+    {x, y: win.map(d => d.bia), name: t("fluid"), mode: "lines", yaxis: "y2", line: {color: "#7B4FD0", width: 1.5, dash: "dash"}},
+  ], layout({shapes: sh, yaxis: {gridcolor: "#EEF1F6", title: {text: t("mm"), font: {size: 11}}}, yaxis2: {overlaying: "y", side: "right", range: [-10, 4], showgrid: false, ticksuffix: "%"}}), PL);
+  Plotly.react("chB", [
+    {x, y: win.map(d => d.spo2), name: "SpO₂ %", mode: "lines", line: {color: "#2F80ED", width: 2}},
+    {x, y: win.map(d => d.rest_hr), name: t("r_hr"), mode: "lines", yaxis: "y2", line: {color: "#E5484D", width: 2}},
+  ], layout({shapes: sh, yaxis: {gridcolor: "#EEF1F6", range: [88, 99]}, yaxis2: {overlaying: "y", side: "right", range: [55, 95], showgrid: false}}), PL);
+  Plotly.react("chA", [
+    {x, y: win.map(d => d.steps), type: "bar", name: t("r_steps"), marker: {color: win.map(d => d.signals.activity ? "#F07F23" : "#9DB7D3")}},
+  ], layout({shapes: sh, showlegend: false}), PL);
+  Plotly.react("chG", [
+    {x, y: win.map(d => d.glu_mean), name: t("mean"), mode: "lines", line: {color: SUGAR, width: 2}},
+    {x, y: win.map(d => d.glu_night_min), name: t("night_low"), mode: "lines+markers", line: {color: "#B79BE8", width: 1.5}, marker: {size: win.map(d => d.glu_night_min < 70 ? 10 : 4), color: win.map(d => d.glu_night_min < 70 ? "#E5484D" : "#B79BE8")}},
+  ], layout({shapes: shapes([{type: "line", xref: "paper", x0: 0, x1: 1, y0: 70, y1: 70, line: {color: "#E5484D", width: 1, dash: "dash"}}]), yaxis: {gridcolor: "#EEF1F6", range: [40, 200]}}), PL);
+  Plotly.react("chP", [
+    {x, y: win.map(d => d.sbp), name: t("systolic"), mode: "lines", line: {color: "#0B3C5D", width: 2}},
+  ], layout({shapes: sh, showlegend: false, yaxis: {gridcolor: "#EEF1F6", range: [85, 155]}}), PL);
+  const row = (label, ok) => ({x, y: win.map(() => label), type: "scatter", mode: "markers", marker: {symbol: "square", size: 12, color: win.map(d => ok(d) ? "#22A06B" : "#E5484D")}, name: "", hoverinfo: "x"});
+  Plotly.react("chD", [row(t("pill_diur"), d => d.diuretic_taken), row(t("pill_weigh"), d => d.weight != null), row(t("pill_diet"), d => d.diet_ok)],
+    layout({shapes: sh, showlegend: false, margin: {l: 76, r: 20, t: 10, b: 34}, yaxis: {gridcolor: "#fff", automargin: true}}), PL);
+}
+
+/* ---------------------------------------------------------- how / diet / share */
+function renderHow() {
+  const card = (b, k) => `<div class="step"><b>${b}</b><h4>${t(k + "t")}</h4><p>${t(k)}</p></div>`;
+  $("howBox").innerHTML = [1, 2, 3, 4].map(i => card("0" + i, "how" + i)).join("");
+  $("payBox").innerHTML = [["🔁", 1], ["🏥", 2], ["⌚", 3], ["🔗", 4]].map(([ic, i]) => card(ic, "pay" + i)).join("");
+  $("safeBox").innerHTML = [["🩺", 1], ["🔒", 2], ["📜", 3], ["📊", 4]].map(([ic, i]) => card(ic, "safe" + i)).join("");
+}
+function openDiet() {
+  const h = [t("breakfast"), t("lunch"), t("dinner")];
+  $("dietTbl").innerHTML = `<table><tr><th></th>${h.map(x => `<th>${x}</th>`).join("")}</tr>${DIET[lang].map((r, i) => `<tr><th>${t("wd")[i]}</th>${r.map(c => `<td>${c}</td>`).join("")}</tr>`).join("")}</table>
+    <h4 style="margin:16px 0 8px">🚫 ${t("show_no").replace(" ›", "")}</h4><div class="no">${AVOID[lang].map(([a, b]) => `<div><span>${a}</span><span>${b}</span></div>`).join("")}</div>`;
+  $("dietModal").classList.add("on");
+}
+const reportUrl = () => location.href.split(/[?#]/)[0] + `?view=doctor&day=${cur + 1}&lang=${lang}`;
+function openShare() {
+  const box = $("qr");
+  if (window.qrcode) { const q = qrcode(0, "M"); q.addData(reportUrl()); q.make(); box.innerHTML = q.createSvgTag({cellSize: 5, margin: 2, scalable: true}); }
+  else box.innerHTML = `<div class="muted" style="font-size:12px;word-break:break-all">${reportUrl()}</div>`;
+  $("shareModal").classList.add("on");
+}
+
+/* ------------------------------------------------------------------ shell */
+function renderStatic() {
+  document.documentElement.lang = lang; document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+  document.querySelectorAll("[data-t]").forEach(el => el.textContent = t(el.dataset.t));
+  $("langBtn").textContent = lang === "ar" ? "English" : "العربية";
+  renderVoiceTriggers(); renderHow();
+}
+function render() {
+  const d = DAYS[cur];
+  $("slider").value = cur;
+  $("dayLbl").textContent = `${t("day")} ${cur + 1} ${t("of")} ${DAYS.length}`;
+  $("dateLbl").textContent = `${t("wd")[weekday(d.date)]} · ${dateStr(d.date)}`;
+  if (view === "patient") { renderPatient(); renderVoice(); renderEngine(); }
+  if (view === "band") renderBand();
+  if (view === "family") renderFamily();
+  if (view === "doctor") renderDoctor();
+}
+function go(day) { cur = Math.max(0, Math.min(DAYS.length - 1, day)); voiceMode = null; convo = []; manualSwell = false; render(); }
+function stop() { clearInterval(playing); playing = null; $("play").textContent = "▶"; }
+function step() {
+  const before = DAYS[cur];
+  go(cur + 1);
+  const d = DAYS[cur];
+  const escalated = d.level > before.level || (d.level && (d.streams || []).join() !== (before.streams || []).join());
+  if (view === "patient" && escalated) { const m = autoMode(d); if (m) fire(m); }
+  if (view === "family" && d.calls && !before.calls) setTimeout(ringIncoming, 400);
+}
+function play(from, to, ms = 1300, after) {
+  stop(); if (from != null) go(from);
+  $("play").textContent = "❚❚";
+  playing = setInterval(() => { if (cur >= (to ?? DAYS.length - 1)) { stop(); after && after(); return; } step(); }, ms);
+}
+function show(v) {
+  view = v;
+  document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x.dataset.v === v));
+  document.querySelectorAll(".view").forEach(s => s.classList.toggle("on", s.id === "v-" + v));
+  render();
+  if (v === "doctor") setTimeout(() => document.querySelectorAll(".plot").forEach(p => window.Plotly && Plotly.Plots.resize(p)), 60);
+}
+
+$("slider").oninput = e => { stop(); go(+e.target.value); };
+$("prev").onclick = () => { stop(); go(cur - 1); };
+$("next").onclick = () => { stop(); step(); };
+$("play").onclick = () => playing ? stop() : play();
+document.querySelectorAll("[data-sc]").forEach(b => b.onclick = () => {
+  const sc = b.dataset.sc;
+  if (sc === "normal") { stop(); go(20); }
+  if (sc === "false") play(37, 40);
+  if (sc === "wedding") { if (view === "patient" || view === "how") show("band"); play(44, 47, 1600); }
+  if (sc === "sugar") { show("family"); play(48, 50, 1200); }
+  if (sc === "episode") play(64, 73, 1400);
+  if (sc === "after") { stop(); go(85); }
+});
+$("tabs").onclick = e => { const b = e.target.closest("button"); if (b) show(b.dataset.v); };
+$("period").onclick = e => {
+  const b = e.target.closest("button"); if (!b) return;
+  period = +b.dataset.p; document.querySelectorAll("#period button").forEach(x => x.classList.toggle("on", x === b)); renderDoctor();
+};
+$("langBtn").onclick = () => { lang = lang === "ar" ? "en" : "ar"; convo = []; renderStatic(); render(); };
+$("hearing").onchange = e => { hearing = e.target.checked; if (hearing) speechSynthesis && speechSynthesis.cancel(); renderVoice(); };
+$("swell").oninput = e => { manualSwell = true; setSwellUI(+e.target.value); };
+$("printBtn").onclick = () => window.print();
+$("closeDiet").onclick = () => $("dietModal").classList.remove("on");
+$("closeShare").onclick = () => $("shareModal").classList.remove("on");
+$("openReport").onclick = () => { $("shareModal").classList.remove("on"); show("doctor"); window.scrollTo(0, 0); };
+["dietModal", "shareModal"].forEach(id => $(id).onclick = e => { if (e.target.id === id) e.currentTarget.classList.remove("on"); });
+if (window.speechSynthesis) speechSynthesis.onvoiceschanged = () => {};
+
+const params = new URLSearchParams(location.search);
+if (params.get("lang") === "en") lang = "en";
+if (params.get("day")) cur = Math.max(0, Math.min(DAYS.length - 1, +params.get("day") - 1));
+renderStatic();
+show(["patient", "band", "family", "doctor", "how"].includes(params.get("view")) ? params.get("view") : "patient");
+
+</script>
+</body>
+</html>
